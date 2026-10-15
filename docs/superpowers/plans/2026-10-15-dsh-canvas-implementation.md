@@ -130,7 +130,9 @@ Request ids: `SessionRequestId` = `randomUUID()`-branded string (session.ts:229)
       "inject": [
         "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-connection",
-        "@deepdeep-placeholder"
+        "@deepseek-ai/dsh-client-ui-conversation",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-locale"
       ],
       "platform": "web"
     }
@@ -171,9 +173,7 @@ Request ids: `SessionRequestId` = `randomUUID()`-branded string (session.ts:229)
 }
 ```
 
-**Step 1 fix (required)**: the `dsh.client.inject` array must be exactly:
-`["@deepseek-ai/dsh-client-runtime", "@deepseek-ai/dsh-client-connection", "@deepseek-ai/dsh-client-ui-conversation", "@deepseek-ai/dsh-client-ui-slots", "@deepseek-ai/dsh-client-locale"]`
-(the placeholder line above must not survive).
+**Step 1 fix note**: the `dsh.client.inject` array above is authoritative — copy it verbatim.
 
 - [ ] **Step 2: Write cordis.patch.yml**
 
