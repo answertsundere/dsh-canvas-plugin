@@ -128,10 +128,9 @@ Request ids: `SessionRequestId` = `randomUUID()`-branded string (session.ts:229)
     "bundle": { "patch": "./cordis.patch.yml" },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-locale"
       ],
       "platform": "web"
@@ -152,12 +151,12 @@ Request ids: `SessionRequestId` = `randomUUID()`-branded string (session.ts:229)
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-locale": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-client-runtime": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-conversation": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
     "@testing-library/react": "^16.3.0",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
@@ -173,7 +172,10 @@ Request ids: `SessionRequestId` = `randomUUID()`-branded string (session.ts:229)
 }
 ```
 
-**Step 1 fix note**: the `dsh.client.inject` array above is authoritative — copy it verbatim.
+**Step 1 fix notes** (verified during implementation, Task 1 rounds 1-2):
+- The `dsh.client.inject` array above is authoritative — copy it verbatim. `@deepseek-ai/dsh-client-runtime` and the `ui-slots` inject row are NOT valid at 0.2.0-rc.2 (runtime does not exist; ui-slots declares no `dsh.client` entry). Do not add either as an inject row. `@deepseek-ai/dsh-client-ui-renderer` is the row that provides `ctx.slots`.
+- A package with no `dsh.client` manifest is not automatically safe to drop from inject (ui-renderer/connection also lack one yet are load-bearing). Only drop a row after verifying it is neither a client entry nor a provider of a `ctx` service.
+- Do NOT list `@deepseek-ai/dsh-client-runtime` in devDependencies; `@deepseek-ai/dsh-client-ui-slots` stays in devDependencies (its `LocaleNamespaceMap` types are required) but never in inject.
 
 - [ ] **Step 2: Write cordis.patch.yml**
 
