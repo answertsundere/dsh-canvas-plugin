@@ -611,16 +611,24 @@ export function openTimeline(sessions: SessionsLike, uiConversation: UiConversat
 export interface ForkDeps {
   fork(req: { sessionId: string; atSeq: number; increaseTitle: boolean; onCreated?: (id: string) => void }): Promise<string>
   findChildByScan(parentId: string): Promise<string | undefined>
-  using<T>(sessionId: string, op: (send: (text: string, requestId: string) => Promise<void>) => Promise<T>): Promise<T>
+  using<T>(sessionId: string, op: (send: (text: string, requestId: string) => Promise<PromptOutcome>) => Promise<T>): Promise<T>
   newRequestId(): string
 }
+export type PromptOutcome = { ok: true } | { ok: false; error: string }
 export type ForkPhase = 'validating' | 'forking' | 'launching' | 'done' | 'failed' | 'unverified'
 export interface ForkResult { readonly childId: string; readonly phase: ForkPhase; readonly error?: string; readonly retriedPrompt: boolean }
-export async function runForkTransaction(deps: ForkDeps, req: { sessionId: string; atSeq: number; instruction?: string; launch: 'now' | 'later'; requestId: string }): Promise<ForkResult>
+export async function runForkTransaction(deps: ForkDeps, req: { sessionId: string; atSeq: number; instruction?: string; launch: 'now' | 'later'; requestId?: string }): Promise<ForkResult>
 ```
-Behavior: fork once (`onCreated` caches childId); on fork rejection whose error indicates receipt loss (message contains `ECONN`/`aborted`/`timeout`) → `findChildByScan` → found → continue; not found → `unverified` (never re-fork). `launch:'later'` → `done` after fork. `launch:'now'` → `using(childId, send => send(instruction, requestId))`; prompt failure → retry ONCE with the same requestId, set `retriedPrompt:true`; second failure → `failed`.
+Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a non-blank instruction) → fork once → optionally prompt with a single retry.
 
-- [ ] **Step 1: Failing tests**: happy path (fork→prompt once, same requestId); receipt-loss recovery (fork rejects, scan finds child, prompt proceeds, fork called exactly once); scan miss → `unverified` and fork called once; prompt fails twice → `failed`, fork once, both prompts same id; `launch:'later'` → no prompt.
+**Task 6 corrections (verified against local source, 2026-10-16):**
+- **`prompt()`'s `requestId` is the FOURTH parameter**, after `signal`: `prompt(content, mode, signal?, requestId?)` (`client/contract/session.ts:87-92`; canonical call `ui-conversation client/service.ts:293`). The original plan wrote `prompt(blocks, 'queue', requestId)`, which passes the id as `signal` — the id is dropped and Host-side dedupe silently stops working, breaking M0 gate 7. Task 11's wiring must pass `undefined` for `signal`.
+- **`prompt()` does not reject on business errors**: it resolves `Promise<RemoteResult<{accepted:true}>>` (`ui-conversation client/service.ts:293-295` reads `result.ok`). A transaction that only catches rejections would read a refused prompt as success, so `send` returns an unwrapped `PromptOutcome` and the retry decision keys on `ok`.
+- **`onCreated` fires before the optional title rename, and `fork` rejects when only that rename fails** (`contract/sessions.ts:122-131`). A rejection therefore does not prove the child is absent: the id captured by `onCreated` is checked first, before any scan or error-text reasoning.
+- Recovery does not gate on error text. Any rejection with no observed child attempts a scan, so a lost receipt is recovered however it is worded; the transport-vs-business heuristic only chooses between the `unverified` and `failed` **labels**. A misclassification can never cause a duplicate fork.
+- `requestId` is optional on the request; `deps.newRequestId()` mints one when absent (this is what gives that dep its purpose).
+
+- [ ] **Step 1: Failing tests**: happy path (fork→prompt once, same requestId); rename-failure recovery (fork rejects, `onCreated` captured the child, no scan, fork called exactly once); receipt-loss recovery (fork rejects, scan finds child, prompt proceeds, fork exactly once); scan miss with a transport error → `unverified` and fork called once; scan miss with a business error → `failed`; prompt fails twice → `failed`, fork once, both prompts the same id; retried prompt succeeds → `done` with `retriedPrompt`; `launch:'later'` → no prompt; `launch:'now'` blank instruction and invalid `atSeq` → `failed` with **no** fork; a thrown send is retried; `requestId` defaults to `newRequestId()`; instruction is trimmed.
 - [ ] **Step 2: FAIL → 3: implement → 4: PASS; commit** `feat: fork transaction with idempotent prompt retry and receipt-loss recovery`
 
 ---
