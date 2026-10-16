@@ -582,16 +582,23 @@ Order of precedence: `!connected → unknown`; `!available → failed`; `running
 ```ts
 export interface TimelineSource {
   readonly sessionId: string
-  readonly snapshot: () => unknown
-  readonly subscribe: (listener: () => void) => () => void
+  openState(): OpenStateLike            // 'cold' | 'loading' | 'open' | 'error'
+  snapshot(): unknown
+  subscribe(listener: () => void): () => void
   loadOlder(): Promise<boolean>
-  release(): void
+  release(): void                       // idempotent
 }
 export function openTimeline(sessions: SessionsLike, uiConversation: UiConversationLike, sessionId: string): Promise<TimelineSource>
 ```
-`SessionsLike` = `{ retain(target, options): { ready: Promise<Binding>; release(): void }; binding(id): { session: { loadOlder(): Promise<void> } } | undefined }` — after `await ref.ready`, check `ref.ready` resolution's `openState` via the chat target snapshot if present, else proceed; expose `openState` on the source for UI warnings.
+`SessionsLike = { retain(target, options): SessionReferenceLike }` where `SessionReferenceLike = { sessionId; binding; ready: Promise<SessionBindingLike>; release() }`. The binding is taken from `reference.ready`, **not** from a second `sessions.binding(id)` lookup — the reference is what keeps the Session alive, so its own resolved binding removes a lookup and a generation race. `openState` is read from `binding.session.getSnapshot().openState`, which is guaranteed present, rather than from the chat target snapshot (whose type is `… | undefined`). `loadOlder()` delegates to `binding.session.loadOlder()` and returns whether the window actually changed, since `loadOlder(): Promise<void>` reports completion only and lands failures in `snapshot.openState`/`loadingOlder`.
 
-- [ ] **Step 1: Failing tests** with fakes: ready resolves → snapshot/subscribe exposed; ready rejects → propagate; release called on `release()`; `loadOlder` delegates; subscribe unsubscribes.
+**Task 5 corrections (verified against local source, 2026-10-16):**
+- `retain` returns `SessionReference { sessionId, binding, ready: Promise<SessionBinding>, release() }` (`client/contract/sessions.ts:24-33`), and `SessionFace = ISession & ObservableSnapshot<SessionSnapshot>` (`…/contract/session.ts:155`) — so both `getSnapshot()` and `loadOlder()` hang off `binding.session`.
+- `SessionRetainOptions.source` is a **closed, merge-extensible union** (`SessionReferenceSourceMap`, `client/index.ts:80-88`) whose base members are `controllerOperation | gateway`; every other plugin declares its own label (`ui-workspace` → `workspaceOperation`, `ui-goal` → `goalActivation`, `ui-session` → `mainView`). This plugin declares `canvasNode` and retains under it so M0 gate 11 can attribute its retains. The declaration merge is deferred to Task 13 (the package is not a dependency here, so `declare module` is TS2664); the label still works at runtime.
+- **`uiConversation.binding(sessionId)` throws** for an unknown *or inactive* session (`ui-conversation client/conversation/assembly.ts:237-243`), so it may only be called after a retain has made the session current, and its throw must release the retain.
+- **Both failure paths must release before rethrowing.** A failed read that leaves a Session pinned open is precisely the residue M0 gate 11 checks for.
+
+- [ ] **Step 1: Failing tests** with fakes: retain called with `{source: canvasNode}` and the chat target read off the retained binding; ready resolves → snapshot/subscribe exposed; ready rejects → reject **and release called once, with no conversation lookup**; binding throws → reject and release; `loadOlder` delegates and reports window change; subscribe unsubscribes; double `release()` releases once.
 - [ ] **Step 2: FAIL → 3: implement → 4: PASS; commit** `feat: timeline event stream adapter with retain/release lifecycle`
 
 ---
