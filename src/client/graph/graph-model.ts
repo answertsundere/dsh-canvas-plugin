@@ -16,6 +16,19 @@ const byAge = (createdAt: (id: SessionId) => number) => (a: SessionId, b: Sessio
   return delta !== 0 ? delta : a < b ? -1 : a > b ? 1 : 0
 }
 
+/**
+ * Builds the workspace lineage graph the canvas renders.
+ *
+ * Roots are members with no parent, an external (non-member) parent, or a parent
+ * missing from the node map. A member still unreachable from those roots can
+ * only sit inside a lineage cycle, so the earliest such member (by `createdAt`,
+ * then id) is promoted to a root and the traversal repeats — at most
+ * `members.size` iterations, since every pass appends exactly one root. A
+ * promoted root keeps its raw `parentId`, so consumers must read `roots` and
+ * `CanvasNode.depth` rather than testing for a parentless node.
+ *
+ * Duplicate ids in `summaries` are last-write-wins.
+ */
 export function buildLineageGraph(
   summaries: SessionSummaryLike[],
   memberIds: ReadonlySet<string>,
@@ -35,23 +48,6 @@ export function buildLineageGraph(
   }
 
   const createdAt = (id: SessionId): number => members.get(id)?.createdAt ?? 0
-  const nodes = new Map<SessionId, CanvasNode>()
-  for (const [id, summary] of members) {
-    const parentId = summary.parentId ?? null
-    nodes.set(id, {
-      id,
-      parentId,
-      externalParent: parentId !== null && !memberIds.has(parentId),
-      title: summary.title ?? id,
-      createdAt: summary.createdAt,
-      running: summary.running,
-      available: summary.available,
-      seeded: summary.seeded ?? false,
-      cwd: summary.cwd ?? null,
-      childCount: children.get(id)?.length ?? 0,
-    })
-  }
-
   const measureDepth = (roots: readonly SessionId[]): { depth: Map<SessionId, number>; maxDepth: number } => {
     const depth = new Map<SessionId, number>()
     const queue: SessionId[] = []
@@ -66,6 +62,7 @@ export function buildLineageGraph(
       if (id === undefined) continue
       const at = depth.get(id) ?? 0
       for (const child of children.get(id) ?? []) {
+        // visited guard: each node is placed once, so a back-edge inside a cycle is dropped
         if (depth.has(child)) continue
         depth.set(child, at + 1)
         if (at + 1 > maxDepth) maxDepth = at + 1
@@ -81,17 +78,35 @@ export function buildLineageGraph(
     if (parentId == null || !members.has(parentId)) roots.push(id)
   }
 
-  let maxDepth = 0
+  let measured = measureDepth(roots)
   for (;;) {
-    const { depth, maxDepth: reached } = measureDepth(roots)
-    const unreached = [...members.keys()].filter(id => !depth.has(id))
-    if (unreached.length === 0) {
-      maxDepth = reached
-      break
-    }
+    // cycle promotion: whatever the roots cannot reach is cycle-closed, so one
+    // node per such component is promoted to a root and the BFS reruns
+    const unreached = [...members.keys()].filter(id => !measured.depth.has(id))
+    if (unreached.length === 0) break
     const next = [...unreached].sort(byAge(createdAt))[0]
     if (next === undefined) break
     roots.push(next)
+    measured = measureDepth(roots)
+  }
+  const { depth, maxDepth } = measured
+
+  const nodes = new Map<SessionId, CanvasNode>()
+  for (const [id, summary] of members) {
+    const parentId = summary.parentId ?? null
+    nodes.set(id, {
+      id,
+      parentId,
+      externalParent: parentId !== null && !memberIds.has(parentId),
+      title: summary.title ?? id,
+      createdAt: summary.createdAt,
+      running: summary.running,
+      available: summary.available,
+      seeded: summary.seeded ?? false,
+      cwd: summary.cwd ?? null,
+      childCount: children.get(id)?.length ?? 0,
+      depth: depth.get(id) ?? 0,
+    })
   }
 
   roots.sort(byAge(createdAt))

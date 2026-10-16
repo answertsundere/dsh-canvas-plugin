@@ -11,6 +11,8 @@ export interface CanvasNode {
   readonly seeded: boolean
   readonly cwd: string | null
   readonly childCount: number
+  /** BFS depth from the nearest root; 0 for roots, including external-parent and cycle-promoted roots. */
+  readonly depth: number
 }
 
 export interface CanvasGraph {
