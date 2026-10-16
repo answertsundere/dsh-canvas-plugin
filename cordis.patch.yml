@@ -1,0 +1,8 @@
+# Mount the canvas bundle into a DSH profile. Config only: every runtime knob
+# defaults in code so a future DSH version cannot break this row.
+- insert:
+    - id: canvas
+      name: dsh-canvas
+      config:
+        defaultLayout: lineage
+        sharedCwdWarning: true
