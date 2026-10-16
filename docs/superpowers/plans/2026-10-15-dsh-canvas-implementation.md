@@ -290,6 +290,8 @@ export interface CanvasNode {
   readonly seeded: boolean
   readonly cwd: string | null
   readonly childCount: number
+  /** Layered-layout column: 0 for roots and external roots (Task 2 addition). */
+  readonly depth: number
 }
 
 export interface CanvasGraph {
