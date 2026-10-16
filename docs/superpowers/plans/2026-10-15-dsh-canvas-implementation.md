@@ -10,7 +10,8 @@
 
 ## Global Constraints
 
-- **Target**: DeepSeek Harness `0.2.0-rc.2`, desktop profile. All DSH APIs must be verified against the local checkout `D:\deepseek harness` (commit `639ed01539`), never against online master docs.
+- **Target**: DeepSeek Harness `0.2.0-rc.2`, desktop profile for shipping. All DSH APIs must be verified against the local checkout `D:\deepseek harness` (commit `639ed01539`), never against online master docs.
+- **Desktop profile is not CLI-installable**: `apps/cli/src/args.ts:83-87` rejects `--profile desktop` on every command ("managed exclusively by the Electron application"). Local development and all M0 gates run on the **web profile** (`dsh plugin --profile web add file:<repo>` + `dsh web --port 3090`); the desktop shell serves the same `dsh-web-frontend` client runtime, so web-profile verification covers every behavior gate. Desktop install happens only after npm publish, through the app's 插件 page (a user action in Task 13).
 - **Plugin shape**: local client plugin loaded at runtime; must NOT patch or rebuild DSH core. `dsh.bundle.patch` inserts one row; `dsh.client.platform: "web"` (web-compatible, desktop-first).
 - **Zero host storage**: never write to `~/.dsh` or `$DSH_HOME/canvas/`. Read-only projection of DSH session data.
 - **Branches share cwd**: `SessionForkRequest` has no cwd (commands.ts:275 inherits source cwd). The UI must carry a persistent 「⚠ 并行写入」 affordance; no directory isolation in v1.
@@ -468,19 +469,22 @@ export const CanvasTab: FC = () => (
 Run: `pnpm vitest run && pnpm tsc -p tsconfig.json --noEmit && pnpm tsdown`
 Verify `lib/client.js` first line contains `window.__ModuleLoader__.load(`.
 
-- [ ] **Step 11: Write scripts/install-local.mjs and install into the desktop profile**
+- [ ] **Step 11: Write scripts/install-local.mjs (web profile) and install**
 
 ```js
-// scripts/install-local.mjs
+// scripts/install-local.mjs — local dev loop. The desktop profile refuses CLI
+// mutation by design (apps/cli/src/args.ts:83-87), so development installs into
+// the web profile; the desktop shell serves the same client runtime.
 import { execFileSync } from 'node:child_process'
 const repo = 'D:/deepseek harness'
 const pkg = 'file:C:/Users/sshuser/Desktop/dsh-canvas-plugin'
-execFileSync('corepack', ['pnpm', 'dsh', 'plugin', '--profile', 'desktop', 'add', pkg],
+execFileSync('corepack', ['pnpm', 'dsh', 'plugin', '--profile', 'web', 'add', pkg],
   { cwd: repo, stdio: 'inherit', shell: true })
+console.log('installed into web profile; start it with: corepack pnpm dsh web --port 3090 --no-open')
 ```
 
 Run: `node scripts/install-local.mjs`
-Then restart the desktop app: `Start-Process "$env:LOCALAPPDATA\Programs\DeepSeek Harness\DeepSeek Harness.exe"` (app must be quit first), confirm port 19387 listens, and confirm the 「画布」 tab appears next to 对话/轨迹. **M0 gate #1 passes when the tab shows and disappears after `dsh plugin --profile desktop remove dsh-canvas` + restart.**
+Then boot the web profile on a free port (`--port 3090`, since 3080 is squatted on this machine) and confirm the 「画布」 tab appears next to 对话/轨迹. **M0 gate #1 passes when the tab shows and disappears after `dsh plugin --profile web remove dsh-canvas` + reboot.**
 
 - [ ] **Step 12: Commit**
 
@@ -666,7 +670,8 @@ Behavior: fork once (`onCreated` caches childId); on fork rejection whose error 
 **Files:** Create `docs/superpowers/m0-verification.md` (results table), `scripts/m0-check.mjs` (assertions where scriptable)
 **Steps:**
 - [ ] Run `pnpm verify` (typecheck+test+build).
-- [ ] Install into desktop profile (`pnpm run install:local`), restart the app, walk all 12 M0 gates from the spec (tab show/hide; workspace graph; exact atSeq inheritance checked against a real session; **empty branch does not auto-run queued input**; single launch; fork-receipt-loss recovery; prompt-receipt-loss single execution; two parallel branches observable; subscription survives switch/disconnect/reconnect; 500-node stress with fixtures; uninstall leaves no retains; node→session switching). Record PASS/FAIL + evidence per gate.
+- [ ] Install into the **web** profile (`pnpm run install:local`), boot `dsh web --port 3090 --no-open`, and walk all 12 M0 gates from the spec in the browser (tab show/remove; workspace graph; exact atSeq inheritance checked against a real session; **empty branch does not auto-run queued input**; single launch; fork-receipt-loss recovery; prompt-receipt-loss single execution; two parallel branches observable; subscription survives switch/disconnect/reconnect; 500-node stress with fixtures; uninstall leaves no retains; node→session switching). Record PASS/FAIL + evidence per gate.
+- [ ] The desktop-shell tab check is deferred to Task 13 (it requires an npm install through the app's 插件 page, which is a user action).
 - [ ] Fix every FAIL before continuing (each fix gets its own commit).
 - [ ] Commit the results doc: `test: M0 verification results`.
 
