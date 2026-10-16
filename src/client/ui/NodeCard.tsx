@@ -1,0 +1,90 @@
+import type { FC, MouseEvent } from 'react'
+import type { CanvasNode } from '../../shared/contracts.ts'
+import type { StatusBadge } from '../../shared/status.ts'
+import { theme } from '../theme.ts'
+import type { LayoutPoint } from '../graph/graph-layout.ts'
+
+export interface NodeCardProps {
+  readonly node: CanvasNode
+  readonly status: StatusBadge
+  readonly position: LayoutPoint
+  readonly width: number
+  readonly height: number
+  readonly selected: boolean
+  readonly comparing: boolean
+  /** A running sibling shares this node's cwd, so a parallel write is possible. */
+  readonly parallelWrite: boolean
+  /** The toolbar query matched this node. */
+  readonly highlight: boolean
+  readonly now: number
+  onClick(event: MouseEvent<HTMLDivElement>, id: string): void
+}
+
+export const NodeCard: FC<NodeCardProps> = ({
+  node, status, position, width, height, selected, comparing, parallelWrite, highlight, now, onClick,
+}) => (
+  <div
+    data-canvas-node={node.id}
+    data-selected={selected ? 'true' : 'false'}
+    data-comparing={comparing ? 'true' : 'false'}
+    data-highlight={highlight ? 'true' : 'false'}
+    onClick={event => onClick(event, node.id)}
+    style={{
+      position: 'absolute',
+      left: position.x,
+      top: position.y,
+      width,
+      height,
+      boxSizing: 'border-box',
+      padding: '8px 10px',
+      borderRadius: 10,
+      background: selected ? theme.cardActive : theme.card,
+      border: `1px solid ${selected ? theme.accent : highlight ? theme.warn : theme.border}`,
+      outline: comparing ? `2px solid ${theme.accent}` : undefined,
+      outlineOffset: 2,
+      color: theme.text,
+      font: '12px/1.45 system-ui, sans-serif',
+      cursor: 'pointer',
+      overflow: 'hidden',
+      userSelect: 'none',
+    }}
+  >
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+      <span
+        data-node-status={status.kind}
+        title={status.confirmed ? status.label : `${status.label}（推断）`}
+        style={{
+          width: 8, height: 8, borderRadius: 4, flex: '0 0 auto',
+          background: status.color,
+          opacity: status.confirmed ? 1 : 0.65,
+        }}
+      />
+      <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {node.title}
+      </span>
+      {node.seeded && (
+        <span data-node-seeded="true" title="分叉会话" style={{ color: theme.accent, flex: '0 0 auto' }}>⑂</span>
+      )}
+    </div>
+    <div style={{ color: theme.muted, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      {status.label} · {relativeTime(now, node.createdAt)} · {node.childCount} 分支
+      {node.externalParent && <span title="父会话不在当前工作区"> · 外部父</span>}
+    </div>
+    {parallelWrite && (
+      <div data-node-parallel-write="true" style={{ color: theme.warn, marginTop: 2 }}>
+        ⚠ 并行写入
+      </div>
+    )}
+  </div>
+)
+
+/** Coarse relative time; the canvas only needs "how long ago" at a glance. */
+export function relativeTime(now: number, at: number): string {
+  const seconds = Math.max(0, Math.round((now - at) / 1000))
+  if (seconds < 60) return '刚刚'
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes} 分钟前`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} 小时前`
+  return `${Math.round(hours / 24)} 天前`
+}
