@@ -75,6 +75,8 @@ env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD node scripts/m0-check.mj
 
 The `env -u …` is not decoration: the host's injected shim intercepts pnpm's filesystem calls and produces zero-byte files or `EPERM rename`.
 
+**Taking this project over (by a human or another AI): start with [`HANDOFF.md`](HANDOFF.md)** — current state, the file map of durable knowledge, the commands, the traps that fail silently, and the open decisions.
+
 Two traps that make changes **silently not apply** — see [`docs/superpowers/m0-verification.md`](docs/superpowers/m0-verification.md):
 
 1. A `file:` dependency is **copied**, not linked, and pnpm skips the copy while spec/version are unchanged — so a rebuild must delete the profile's copy first (the install script does).

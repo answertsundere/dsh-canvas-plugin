@@ -79,6 +79,8 @@ env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD node scripts/m0-check.mj
 
 `env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD` 不是装饰：宿主的 shim 会拦 pnpm 的 fs 操作，表现为零字节文件或 `EPERM rename`。
 
+**接管这个项目（人或其他 AI 都算）：先读 [`HANDOFF.md`](HANDOFF.md)**——当前状态、 durable 知识分布、命令清单、静默失败的坑、待决策事项，一册齐。
+
 两个会让改动**静默不生效**的坑，细节见 [`docs/superpowers/m0-verification.md`](docs/superpowers/m0-verification.md)：
 
 1. `file:` 依赖是**拷贝**不是链接，且 spec/version 不变就跳过复制 → 重建后必须删掉 profile 里的副本再装（脚本已处理）。
