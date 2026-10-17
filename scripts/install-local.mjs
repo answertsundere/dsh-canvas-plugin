@@ -14,6 +14,9 @@
 import { execFileSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { existsSync, rmSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 
 const REPO = 'D:/deepseek harness'
 const DEFAULT_PROFILE = 'web-0.1.7'
@@ -58,6 +61,17 @@ for (let i = 0; i < argv.length; i++) {
   } else {
     fail('unknown argument: ' + arg)
   }
+}
+
+// pnpm resolves a `file:` dependency by COPYING it into the profile, and it
+// skips the copy while the spec and the version are unchanged. A rebuild alone
+// therefore never reaches the running profile: the server keeps serving the
+// first copy it ever made, with no error anywhere. Dropping the copy first is
+// what makes `pnpm install` re-materialise it.
+const installed = join(homedir(), '.dsh', 'profiles', profile, 'node_modules', 'dsh-canvas')
+if (existsSync(installed)) {
+  rmSync(installed, { recursive: true, force: true })
+  console.log('removed the previous copy at ' + installed)
 }
 
 execFileSync('corepack', ['pnpm', 'dsh', 'plugin', '--profile', profile, 'add', pkg],
