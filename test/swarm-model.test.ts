@@ -333,3 +333,20 @@ describe('turnGroups', () => {
     expect(turnGroups([])).toEqual([])
   })
 })
+
+import { paletteAccent, SWARM_PALETTES } from '../src/client/swarm/swarm-model.ts'
+
+describe('paletteAccent', () => {
+  it('the default palette walks the hue wheel with time', () => {
+    const aurora = SWARM_PALETTES[0]!
+    expect(paletteAccent(aurora, 0)).toBe('hsl(0, 72%, 64%)')
+    expect(paletteAccent(aurora, 5000)).toBe('hsl(100, 72%, 64%)')
+    expect(paletteAccent(aurora, 0)).not.toBe(paletteAccent(aurora, 3000))
+  })
+
+  it('a fixed palette is constant', () => {
+    const cyan = SWARM_PALETTES.find(p => p.id === 'cyan')!
+    expect(paletteAccent(cyan, 0)).toBe('#39d0d8')
+    expect(paletteAccent(cyan, 999999)).toBe('#39d0d8')
+  })
+})

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { AgentSwarmView } from '../src/client/ui/AgentSwarmView.tsx'
 import type { AgentSwarmState } from '../src/client/controllers/agent-swarm-controller.ts'
+import { paletteAccent, SWARM_PALETTES } from '../src/client/swarm/swarm-model.ts'
 import { layoutSwarm } from '../src/client/swarm/swarm-model.ts'
 
 afterEach(cleanup)
@@ -45,10 +46,11 @@ describe('AgentSwarmView', () => {
   })
 
   it('a hot edge crawls a pulse toward the parent; a cold edge draws none', () => {
+    const accent = paletteAccent(SWARM_PALETTES[0]!, NOW)
     const { container } = render(<AgentSwarmView swarm={swarmState()} onClose={() => {}} nowMs={NOW} />)
     expect(document.querySelectorAll('[data-swarm-pulse]')).toHaveLength(1)
-    expect(container.querySelector('[data-swarm-edge="root->a"]')?.getAttribute('stroke')).toBe('#6af')
-    expect(container.querySelector('[data-swarm-edge="root->b"]')?.getAttribute('stroke')).not.toBe('#6af')
+    expect(container.querySelector('[data-swarm-edge="root->a"]')?.getAttribute('stroke')).toBe(accent)
+    expect(container.querySelector('[data-swarm-edge="root->b"]')?.getAttribute('stroke')).not.toBe(accent)
   })
 
   it('shows the streaming agent snippet', () => {
@@ -104,10 +106,11 @@ describe('AgentSwarmView activity ring', () => {
   })
 
   it('a pending tool draws a hot edge and a crawling pulse; a settled one is dashed and cold', () => {
+    const accent = paletteAccent(SWARM_PALETTES[0]!, NOW)
     render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={NOW} />)
     expect(document.querySelectorAll('[data-swarm-pulse]')).toHaveLength(2) // agent a + pending tool
     expect(document.querySelector('[data-swarm-pulse="tool:c2"]')).not.toBeNull()
-    expect(document.querySelector('[data-swarm-tool-edge="c2"]')?.getAttribute('stroke')).toBe('#6af')
+    expect(document.querySelector('[data-swarm-tool-edge="c2"]')?.getAttribute('stroke')).toBe(accent)
     const settledEdge = document.querySelector('[data-swarm-tool-edge="c1"]')
     expect(settledEdge?.getAttribute('stroke-dasharray')).toBe('3 4')
   })
@@ -233,8 +236,30 @@ describe('species split, scaling, and team tasks', () => {
     const agentChip = document.querySelector('[data-swarm-agent="a"]') as HTMLElement
     expect(agentChip.style.outline).toContain('dashed')
     expect(agentChip.textContent).toContain('子代理')
-    expect(container.querySelector('[data-swarm-tool="c1"] [data-robot-mount="pedestal"]')).not.toBeNull()
-    expect(container.querySelector('[data-swarm-agent="a"] [data-robot-mount]')).toBeNull()
+    // Tools are devices (instrument on a stand); agents are people.
+    expect(container.querySelector('[data-swarm-tool="c1"] [data-robot-species="device"]')).not.toBeNull()
+    expect(container.querySelector('[data-swarm-tool="c1"] [data-robot-part="stand"]')).not.toBeNull()
+    expect(container.querySelector('[data-swarm-agent="a"] [data-robot-species="agent"]')).not.toBeNull()
+  })
+
+  it('the palette switches the web accent; aurora is the animated default', () => {
+    const { container } = render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={NOW} />)
+    // Default: the animated gradient accent at NOW.
+    const aurora = paletteAccent(SWARM_PALETTES[0]!, NOW)
+    expect(container.querySelector('[data-swarm-tool-edge="c2"]')?.getAttribute('stroke')).toBe(aurora)
+    fireEvent.click(document.querySelector('[data-swarm-palette="cyan"]') as Element)
+    expect(container.querySelector('[data-swarm-tool-edge="c2"]')?.getAttribute('stroke')).toBe('#39d0d8')
+    expect(document.querySelector('[data-swarm-palette="cyan"]')?.getAttribute('data-active')).toBe('true')
+  })
+
+  it('the wheel zooms and the reset button restores the view', () => {
+    const { container } = render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={NOW} />)
+    const plane = (): HTMLElement => container.querySelector('[data-swarm-plane]') as HTMLElement
+    const before = plane().style.transform
+    fireEvent.wheel(document.querySelector('[data-swarm-stage]') as Element, { deltaY: -100 })
+    expect(plane().style.transform).not.toBe(before)
+    fireEvent.click(document.querySelector('[data-swarm-reset]') as Element)
+    expect(plane().style.transform).toBe(before)
   })
 
   it('renders team tasks in the root card and the header count', () => {

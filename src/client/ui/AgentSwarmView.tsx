@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type CSSProperties, type FC } from 'react'
 import type { AgentSwarmState } from '../controllers/agent-swarm-controller.ts'
 import {
   fitScale,
+  paletteAccent,
   pulseProgress,
+  SWARM_PALETTES,
   sweepProgress,
   toolGlyph,
   turnGroups,
@@ -27,23 +29,23 @@ const VIEW = { width: 980, height: 800 }
 const RING = 230
 const TOOL_RING = 340
 
-const chipStyle = (streaming: boolean): CSSProperties => ({
+const chipStyle = (streaming: boolean, accent: string): CSSProperties => ({
   position: 'absolute',
   transform: 'translate(-50%, -50%)',
   maxWidth: 200,
   padding: '6px 10px',
   borderRadius: 10,
   background: theme.card,
-  border: `1px solid ${streaming ? theme.accent : theme.border}`,
-  boxShadow: streaming ? `0 0 12px ${theme.accent}55` : 'none',
+  border: `1px solid ${streaming ? accent : theme.border}`,
+  boxShadow: streaming ? `0 0 12px ${accent}55` : 'none',
   color: theme.text,
   font: '12px/1.4 system-ui, sans-serif',
   cursor: 'default',
   userSelect: 'none',
 })
 
-const statusColor = (status: 'streaming' | 'running' | 'idle' | 'failed'): string =>
-  status === 'streaming' ? theme.accent
+const statusColor = (status: 'streaming' | 'running' | 'idle' | 'failed', accent: string): string =>
+  status === 'streaming' ? accent
     : status === 'running' ? theme.warn
       : status === 'failed' ? '#e0554d' : theme.muted
 
@@ -132,7 +134,8 @@ const Comet: FC<{
   readonly progress: number
   readonly attr: string
   readonly label: string
-}> = ({ from, to, index, progress, attr, label }) => (
+  readonly accent: string
+}> = ({ from, to, index, progress, attr, label, accent }) => (
   <>
     {[0, 0.05, 0.1].map((lag, lagIndex) => {
       const t = Math.max(0, progress - lag)
@@ -146,7 +149,7 @@ const Comet: FC<{
           cx={point.x}
           cy={point.y}
           r={head ? 4 : 3 - lagIndex * 0.6}
-          fill={theme.accent}
+          fill={accent}
           opacity={head ? 1 : 0.5 - lagIndex * 0.15}
         />
       )
@@ -177,6 +180,14 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
   // require scrolling. Measured, not assumed; unknown sizes read as 1:1.
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [scale, setScale] = useState(1)
+  // Manual zoom and pan on top of the fit scale: the fit makes the web visible,
+  // the wheel and drag make it explorable.
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
+  const [paletteId, setPaletteId] = useState('aurora')
+  const palette = SWARM_PALETTES.find(candidate => candidate.id === paletteId) ?? SWARM_PALETTES[0] as (typeof SWARM_PALETTES)[number]
+  const accent = paletteAccent(palette, now)
   useEffect(() => {
     const element = containerRef.current
     if (element === null || typeof ResizeObserver === 'undefined') return
@@ -228,6 +239,36 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
           {swarm.team != null ? ` · 团队 ${swarm.team.members.length} 人` : ''}
           {pendingTool !== null ? ` · 正在 ${pendingTool.name}` : ''}
         </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+          {SWARM_PALETTES.map(candidate => (
+            <button
+              key={candidate.id}
+              type="button"
+              data-swarm-palette={candidate.id}
+              data-active={candidate.id === paletteId ? 'true' : 'false'}
+              title={candidate.label}
+              onClick={() => setPaletteId(candidate.id)}
+              style={{
+                width: 14, height: 14, borderRadius: 7, padding: 0, cursor: 'pointer',
+                background: candidate.accent ?? 'linear-gradient(120deg, #f66, #6af, #2f9)',
+                border: candidate.id === paletteId ? `2px solid ${theme.text}` : `1px solid ${theme.border}`,
+              }}
+            />
+          ))}
+          <button
+            type="button"
+            data-swarm-reset
+            title="重置缩放与平移"
+            onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}
+            style={{
+              background: theme.card, color: theme.muted,
+              border: `1px solid ${theme.border}`, borderRadius: 6,
+              padding: '2px 8px', font: 'inherit', cursor: 'pointer',
+            }}
+          >
+            ⟲
+          </button>
+        </span>
         <button
           type="button"
           data-swarm-close
@@ -242,13 +283,30 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
         </button>
       </div>
 
-      <div ref={containerRef} style={{ position: 'relative', flex: '1 1 auto', overflow: 'hidden' }}>
+      <div
+        ref={containerRef}
+        data-swarm-stage
+        onWheel={event => {
+          setZoom(current => Math.min(3, Math.max(0.5, current * (event.deltaY < 0 ? 1.12 : 1 / 1.12))))
+        }}
+        onMouseDown={event => {
+          dragRef.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y }
+        }}
+        onMouseMove={event => {
+          const started = dragRef.current
+          if (started === null) return
+          setPan({ x: started.panX + (event.clientX - started.x), y: started.panY + (event.clientY - started.y) })
+        }}
+        onMouseUp={() => { dragRef.current = null }}
+        onMouseLeave={() => { dragRef.current = null }}
+        style={{ position: 'relative', flex: '1 1 auto', overflow: 'hidden', cursor: 'grab' }}
+      >
         <div
           data-swarm-plane
           style={{
             position: 'absolute', left: '50%', top: '50%',
             width: VIEW.width, height: VIEW.height,
-            transform: `translate(-50%, -50%) scale(${scale})`,
+            transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${scale * zoom})`,
             transformOrigin: 'center center',
           }}
         >
@@ -286,7 +344,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                       data-swarm-turn-arc={group.turn}
                       d={`M ${start.x} ${start.y} A ${TOOL_RING + 26} ${TOOL_RING + 26} 0 0 1 ${end.x} ${end.y}`}
                       fill="none"
-                      stroke={theme.accent}
+                      stroke={accent}
                       strokeWidth={1}
                       opacity={0.35}
                     />
@@ -319,13 +377,13 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                       data-swarm-edge={`${edge.from}->${edge.to}`}
                       d={silk}
                       fill="none"
-                      stroke={progress === null ? theme.border : theme.accent}
+                      stroke={progress === null ? theme.border : accent}
                       strokeWidth={progress === null ? 1.2 : 1.8}
                       opacity={progress === null ? 0.9 : 1}
                       className={progress === null ? undefined : 'dsh-swarm-hot'}
                     />
                     {progress !== null && (
-                      <Comet from={from} to={to} index={tools.length + edgeIndex} progress={progress} attr="data-swarm-pulse" label={`${edge.from}->${edge.to}`} />
+                      <Comet from={from} to={to} index={tools.length + edgeIndex} progress={progress} attr="data-swarm-pulse" label={`${edge.from}->${edge.to}`} accent={accent} />
                     )}
                     {sweep !== null && (
                       <circle
@@ -333,7 +391,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                         cx={silkPoint(from, to, tools.length + edgeIndex, sweep).x}
                         cy={silkPoint(from, to, tools.length + edgeIndex, sweep).y}
                         r={3}
-                        fill={theme.accent}
+                        fill={accent}
                         opacity={0.55}
                       />
                     )}
@@ -351,14 +409,14 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                       data-swarm-tool-edge={tool.id}
                       d={silkPath({ x: 0, y: 0 }, to, toolIndex)}
                       fill="none"
-                      stroke={progress === null ? theme.border : theme.accent}
+                      stroke={progress === null ? theme.border : accent}
                       strokeWidth={progress === null ? 1 : 1.6}
                       strokeDasharray={tool.status === 'pending' ? undefined : '3 4'}
                       opacity={progress === null ? 0.7 : 1}
                       className={progress === null ? undefined : 'dsh-swarm-hot'}
                     />
                     {progress !== null && (
-                      <Comet from={{ x: 0, y: 0 }} to={to} index={toolIndex} progress={progress} attr="data-swarm-pulse" label={`tool:${tool.id}`} />
+                      <Comet from={{ x: 0, y: 0 }} to={to} index={toolIndex} progress={progress} attr="data-swarm-pulse" label={`tool:${tool.id}`} accent={accent} />
                     )}
                     {sweep !== null && (
                       <circle
@@ -383,19 +441,20 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                 key={agent.id}
                 data-swarm-agent={agent.id}
                 style={{
-                  ...chipStyle(agent.status === 'streaming'),
+                  ...chipStyle(agent.status === 'streaming', accent),
                   left: VIEW.width / 2 + p.x,
                   top: VIEW.height / 2 + p.y,
-                  outline: `1px dashed ${statusColor(agent.status)}`,
+                  outline: `1px dashed ${statusColor(agent.status, accent)}`,
                   outlineOffset: 4,
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <RobotAvatar
                     size={34}
-                    color={statusColor(agent.status)}
+                    color={statusColor(agent.status, accent)}
                     state={AGENT_ROBOT[agent.status]}
                     variant="agent"
+                    species="agent"
                     statusAttr={{ name: 'data-swarm-status', value: agent.status }}
                   />
                   <div style={{ minWidth: 0 }}>
@@ -446,9 +505,9 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                   padding: '4px 10px 4px 8px',
                   borderRadius: 8,
                   background: theme.card,
-                  border: `1px solid ${pending ? theme.accent : failed ? '#e0554d' : theme.border}`,
+                  border: `1px solid ${pending ? accent : failed ? '#e0554d' : theme.border}`,
                   borderLeft: `3px solid ${failed ? '#e0554d' : visual.color}`,
-                  boxShadow: pending ? `0 0 12px ${theme.accent}55` : 'none',
+                  boxShadow: pending ? `0 0 12px ${accent}55` : 'none',
                   color: pending ? theme.text : failed ? '#e0554d' : theme.muted,
                   font: '11px/1.4 system-ui, sans-serif',
                   whiteSpace: 'nowrap',
@@ -460,7 +519,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                   color={failed ? '#e0554d' : visual.color}
                   state={TOOL_ROBOT[tool.status]}
                   variant={visual.variant}
-                  mount="pedestal"
+                  species="device"
                 />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.name}</span>
                 <span style={{ flex: '0 0 auto', color: failed ? '#e0554d' : theme.muted }}>
@@ -482,8 +541,8 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
               padding: '10px 14px',
               borderRadius: 12,
               background: theme.cardActive,
-              border: `1.5px solid ${rootHot ? theme.accent : theme.border}`,
-              boxShadow: rootHot ? `0 0 16px ${theme.accent}66` : 'none',
+              border: `1.5px solid ${rootHot ? accent : theme.border}`,
+              boxShadow: rootHot ? `0 0 16px ${accent}66` : 'none',
               color: theme.text,
               font: '12px/1.5 system-ui, sans-serif',
               userSelect: 'none',

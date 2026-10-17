@@ -17,6 +17,19 @@ export interface WorkspaceSelection {
 }
 
 /**
+ * The archived session ids the snapshot reports. Archived conversations belong
+ * to the workspace's accounting but not to the canvas — the user put them
+ * away, and a lineage map that keeps showing them is lying about the workspace.
+ */
+export function toArchivedIds(snapshot: unknown): ReadonlySet<string> {
+  const rows = typeof snapshot === 'object' && snapshot !== null
+    ? (snapshot as { archivedSessionIds?: unknown }).archivedSessionIds
+    : undefined
+  if (!Array.isArray(rows)) return new Set()
+  return new Set(rows.filter((id): id is string => typeof id === 'string'))
+}
+
+/**
  * Narrows a workspace snapshot into the rows this adapter reads.
  *
  * Accepts the client `WorkspaceSnapshot` (`{ items }`) or a bare array, and
@@ -71,6 +84,7 @@ export function selectWorkspaceSummaries(
   currentWorkspaceId: string | null | undefined,
   summaries: readonly SessionSummaryLike[],
   fallbackCwd: string | null,
+  archived: ReadonlySet<string> = new Set(),
 ): WorkspaceSelection {
   const items = workspaceItems ?? []
   const current = currentWorkspaceId == null
@@ -84,7 +98,7 @@ export function selectWorkspaceSummaries(
 
     for (const id of current.sessionIds ?? []) {
       const summary = byId.get(id)
-      if (summary === undefined || seen.has(id)) continue
+      if (summary === undefined || seen.has(id) || archived.has(id)) continue
       seen.add(id)
       members.push(summary)
     }
@@ -92,7 +106,7 @@ export function selectWorkspaceSummaries(
     const cwd = current.path ?? fallbackCwd
     if (cwd !== null) {
       for (const summary of summaries) {
-        if (seen.has(summary.id) || summary.cwd !== cwd) continue
+        if (seen.has(summary.id) || summary.cwd !== cwd || archived.has(summary.id)) continue
         seen.add(summary.id)
         members.push(summary)
       }
@@ -104,6 +118,6 @@ export function selectWorkspaceSummaries(
   if (fallbackCwd === null) return { workspaceId: null, members: [] }
   return {
     workspaceId: items.find(item => item.path === fallbackCwd)?.workspaceId ?? null,
-    members: summaries.filter(summary => summary.cwd === fallbackCwd),
+    members: summaries.filter(summary => summary.cwd === fallbackCwd && !archived.has(summary.id)),
   }
 }

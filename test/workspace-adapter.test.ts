@@ -86,3 +86,23 @@ describe('selectWorkspaceSummaries', () => {
     expect(out.members.map(m => m.id)).toEqual(['a'])
   })
 })
+
+import { toArchivedIds } from '../src/client/adapters/workspace-adapter.ts'
+
+describe('archived sessions', () => {
+  it('reads archivedSessionIds defensively', () => {
+    expect(toArchivedIds({ archivedSessionIds: ['x', 3, 'y'] })).toEqual(new Set(['x', 'y']))
+    expect(toArchivedIds({})).toEqual(new Set())
+    expect(toArchivedIds(null)).toEqual(new Set())
+  })
+
+  it('an archived member is excluded from the selection in both directions', () => {
+    const items = [{ workspaceId: 'w1', path: 'C:/w', sessionIds: ['a', 'b'] }]
+    const summaries = [
+      { id: 'a', createdAt: 0, running: false, available: true, cwd: 'C:/w' },
+      { id: 'b', createdAt: 0, running: false, available: true, cwd: 'C:/w' },
+    ]
+    const selection = selectWorkspaceSummaries(items, 'w1', summaries, 'C:/w', new Set(['b']))
+    expect(selection.members.map(m => m.id)).toEqual(['a'])
+  })
+})

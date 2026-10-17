@@ -2,7 +2,7 @@ import type { CanvasGraph, CanvasNode, ComparisonResult, LaunchMode, SessionId }
 import { badge, type StatusBadge } from '../../shared/status.ts'
 import { buildLineageGraph } from '../graph/graph-model.ts'
 import { toSummaries } from '../adapters/session-adapter.ts'
-import { selectWorkspaceSummaries, toWorkspaceItems } from '../adapters/workspace-adapter.ts'
+import { selectWorkspaceSummaries, toArchivedIds, toWorkspaceItems } from '../adapters/workspace-adapter.ts'
 import { deriveStatus, type RuntimeHint } from '../adapters/runtime-status-adapter.ts'
 import { inheritedPrefixLength, conclusionFromEvents, segmentFromEvents, type SessionEventLike } from '../compare/branch-segment.ts'
 import { compareBranches } from '../compare/diff.ts'
@@ -197,6 +197,7 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
       workspaceId,
       summaries,
       cwd,
+      toArchivedIds(deps.workspaceSnapshot()),
     )
     graph = buildLineageGraph(selection.members, new Set(selection.members.map(summary => summary.id)))
 

@@ -433,3 +433,30 @@ export function turnGroups(tools: readonly ActivityTool[]): TurnGroup[] {
   })
   return groups
 }
+
+/** One selectable accent scheme for the web. */
+export interface SwarmPalette {
+  readonly id: string
+  readonly label: string
+  /** Fixed accent; absent means the animated gradient. */
+  readonly accent?: string
+}
+
+export const SWARM_PALETTES: readonly SwarmPalette[] = [
+  { id: 'aurora', label: '律动渐变' },
+  { id: 'cyan', label: '极光青', accent: '#39d0d8' },
+  { id: 'amber', label: '琥珀', accent: '#e0a23c' },
+  { id: 'violet', label: '紫罗兰', accent: '#8a7dff' },
+  { id: 'green', label: '松绿', accent: '#2f9e6f' },
+]
+
+/**
+ * The palette's accent at `now`. A fixed palette is constant; the default
+ * animated one walks the hue wheel slowly (a full cycle every 18s) so the
+ * web's light keeps breathing even when nothing is running.
+ */
+export function paletteAccent(palette: SwarmPalette, now: number): string {
+  if (palette.accent !== undefined) return palette.accent
+  const hue = Math.round((now / 50) % 360)
+  return `hsl(${hue}, 72%, 64%)`
+}

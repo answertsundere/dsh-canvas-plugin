@@ -988,6 +988,20 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 27: zoom, archived filtering, palettes, and tool devices (2026-10-17, user feedback)
+
+**Feedback:** can't zoom; archived conversations still on the canvas; want swappable themes with an animated gradient default; and agents vs tools still look like the same robot icon.
+
+**Changes:**
+- **Zoom & pan**: the fit scale makes the web visible; the wheel now multiplies a manual zoom (0.5–3×) and dragging pans, with a ⟲ reset. The plane transform is `translate(±pan) scale(fit × zoom)`.
+- **Archived filtering**: `toArchivedIds` (adapter, defensive) reads `archivedSessionIds` from the workspace snapshot, and `selectWorkspaceSummaries` takes an `archived` set that excludes members in every membership path — sessionIds accounting, cwd matching, and the fallback. Live check: the user's archived sessions are gone from the canvas (8 nodes, none of the archived ones).
+- **Palettes**: `SWARM_PALETTES` + `paletteAccent` (pure) — the default 律动渐变 walks the hue wheel (18s cycle) through the whole web's accent (edges, comets, sweeps, auras, glows), and four fixed schemes (极光青/琥珀/紫罗兰/松绿) switch from header dots. The accent is threaded through `chipStyle`/`statusColor`/`Comet` as a parameter, so nothing hard-codes `theme.accent` in the swarm view any more.
+- **Tools are devices, not robots**: `RobotAvatar` gains `species` — `agent` is a person (full body, arms, chest light), `device` is equipment (the instrument head on a frame with two legs and a base plate, no arms, no torso). Every tool variant renders its device form; agents keep their humanoid form plus the dashed aura. Verified live: all 5 palette dots present, plane transform carrying the fit scale; device species + stand pinned by tests.
+
+**Numbers:** 18 files / **293 tests** green; bundle 168.50 kB / gzip 41.75 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔
