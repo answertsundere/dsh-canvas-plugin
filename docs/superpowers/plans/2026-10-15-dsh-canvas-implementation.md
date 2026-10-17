@@ -769,7 +769,7 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 **Note on the SDD ledger:** `.superpowers/` is gitignored (0 files tracked), so the ledger is a local working artifact. Everything durable from it — every contract correction with its file:line evidence — is written into this plan file, which *is* tracked. That is deliberate: the knowledge must survive a clone even though the scratch ledger does not.
 
 - [ ] Run `pnpm verify` (typecheck+test+build). **Done: 167 tests green, typecheck clean, 76.23 kB / 21.47 kB gzip.**
-- [ ] Install into the **web** profile and walk the 12 M0 gates. **Partially done** — see `docs/superpowers/m0-verification.md`: gate 1 passes at the transport layer, gates 2/3/5/6/7/12 are unit-verified. **Update (Task 15):** gates 4/9/10 are no longer NOT RUN — 10 passes with measurements, 4 is unit+source-verified, 9's flap semantics are unit-verified; still not run are a real network drop and the browser DOM check.
+- [ ] Install into the **web** profile and walk the 12 M0 gates. **Partially done** — see `docs/superpowers/m0-verification.md`: gate 1 passes at the transport layer, gates 2/3/5/6/7/12 are unit-verified. **Update (Task 15):** gates 4/9/10 are no longer NOT RUN — 10 passes with measurements, 4 is unit+source-verified, 9's flap semantics are unit-verified. **Update (Task 15b):** gate 1 passes at the DOM level including the uninstall half (Playwright round trip), and gate 2 has real-data evidence.
 - [ ] Fix every FAIL before continuing. **Done** — the two environment blockers and the three code bugs are fixed and pinned by tests.
 - [ ] Commit the results doc: `test: M0 verification results`. **Done.**
 - [ ] READMEs / LICENSE / notices / CI / compat matrix. **Done.**
@@ -802,6 +802,12 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 - UX consequence pinned from the same source: a later explicit prompt to the child is appended **after** the inherited pending message (`prompt` → `agent.followup`, commands.ts:359-361), so on claim the inherited one runs first. v1 shows no queue depth, so no assertion depends on it.
 - **Gate 9: the flap layer is now unit-tested.** The disconnect half was already covered (`runtime-status.test.ts`: disconnection outranks every signal → `unknown`; a stale `running:true` never reads as live). Added at the controller: drop → every status `unknown`; recovery → live statuses return (not wedged); repeated flapping → the last link state always wins. A real network drop/reconnect is transport behavior the host owns; the canvas only consumes snapshots.
 - The verification doc gained an **SRC** caliber (conclusion proven line-by-line against the local checkout, not run on a real session) so "source-verified" can never be confused with "tested live". Suite: 14 files / 175 tests green.
+
+**Task 15b: gate 1 closed at the DOM level (2026-10-17, same day):**
+- **A blank session renders no tab strip — host behavior, not a plugin defect.** `showTabs = !hideChrome && tabs.length > 1` (`packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx:66`), and `hideChrome` is true while `session.blank && conversationPhase === 'blank'` (`ConversationHeader.tsx:15-24`). A brand-new empty session shows no tab strip at all, so DOM verification must open a session that already has messages. Anyone re-running gate 1 will hit this first.
+- On the user's real session the strip `[data-conversation-tabs]` renders **对话（选中）｜轨迹｜画布**; clicking 画布 mounts the canvas with `data-canvas-node × 3` — real cards with 空闲 status, relative times and 0 分支. Zero pageerror; the two 404s are DSH's own `api/changes.summary` (`ui-deliverables`), which the plugin never calls (grep: 0 matches in `src`).
+- Full round trip: remove → reboot → strip back to `[对话|轨迹]`, 0 occurrences of `dsh-canvas` in the document, 0 nodes, 0 errors; reinstall → reboot → strip back with 画布, 3 nodes, 0 errors, profile copy byte-identical, m0-check 11/11. Evidence screenshots live in `.verify/` (gitignored — they show the user's private workspace).
+- Tooling note: the boot log prints the auth token (`dsh web: http://127.0.0.1:3090/?token=…`) only when its output is **not** piped through `tail`; Playwright 1.60.0 is available inside `D:/npm-global/node_modules/wigolo` with chromium-1223 in `%LOCALAPPDATA%\ms-playwright`.
 
 ---
 

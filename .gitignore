@@ -3,3 +3,4 @@ lib/
 .superpowers/
 *.log
 .DS_Store
+.verify/

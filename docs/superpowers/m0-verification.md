@@ -1,8 +1,8 @@
 # M0 验证结果
 
-Date: 2026-10-17
+Date: 2026-10-17（同日两轮：gates 4/9/10 与关卡 1 DOM 往返）
 Target: DSH `0.2.0-rc.2`，profile `web-0.1.7`，端口 3090
-Run: `pnpm verify` + `node scripts/m0-check.mjs` + `dsh web-0.1.7 --port 3090 --no-open`
+Run: `pnpm verify` + `node scripts/m0-check.mjs` + `dsh web-0.1.7 --port 3090 --no-open` + Playwright（chromium-1223）
 
 状态口径（不要混用）：
 
@@ -15,8 +15,8 @@ Run: `pnpm verify` + `node scripts/m0-check.mjs` + `dsh web-0.1.7 --port 3090 --
 
 | # | 关卡 | 状态 | 证据 |
 |---|---|---|---|
-| 1 | tab 注册 / 卸载 | **PASS（传输层）** | 见下 |
-| 2 | 工作区图谱 | UNIT | `graph-model.test.ts`、`workspace-adapter.test.ts` |
+| 1 | tab 注册 / 卸载 | **PASS（DOM，含卸载）** | 见「关卡 1 的 DOM 级证据」节 |
+| 2 | 工作区图谱 | UNIT + 真实数据 | 真实会话渲染出 3 个节点，见「关卡 1」节 |
 | 3 | 精确分叉 atSeq | UNIT | `branch-segment.test.ts`、`branch-timeline.test.tsx` |
 | 4 | 空分支不自动执行 | **UNIT + SRC** | 见「关卡 4」节 |
 | 5 | 自动启动一次 | UNIT | `fork-transaction.test.ts` |
@@ -51,7 +51,26 @@ plugins/??...,@deepseek-ai/dsh-client-ui-trajectory/client.js,
 
 即：插件被 profile 挂载、进入客户端启动清单、服务端下发的是**当前构建**。
 
-未验证：浏览器 DOM 里 `[对话｜轨迹｜画布]` 三个 tab 是否真的渲染，以及卸载后是否消失。这需要带鉴权的浏览器会话。
+## 关卡 1 的 DOM 级证据（2026-10-17，Playwright + Chromium）
+
+传输层早已 PASS；这次把浏览器里那半也跑完了。方法：启动 `dsh web-0.1.7 --port 3090 --no-open`，从启动日志取 `?token=`，用 Playwright（chromium-1223）打开，切到一个**非空白**会话，检查 tab 条。
+
+**为什么必须用非空白会话**：`ConversationSessionHeader` 的 `showTabs = !hideChrome && tabs.length > 1`（`packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx:66`），而 `hideChrome` 在会话为 blank 时为 true（`ConversationHeader.tsx:15-24`——新开的空会话一条消息都没有）。空白新会话不显示 tab 条，这不是插件的缺陷。
+
+结果（打开用户真实的「查看 neural-creator-dashboard 项目」会话）：
+
+| 检查 | 结果 |
+|---|---|
+| tab 条 `[data-conversation-tabs]` | 出现，三项：**对话（选中）｜轨迹｜画布** |
+| 点「画布」 | 切换成功，`data-canvas-node` × 3 |
+| 画布内容 | 真实数据：「3 个会话」+ 三张节点卡——「查看 neural-creator-dash… 空闲 · 20 分钟前 · 0 分支」「现在我要制作一个项目就是… 空闲 · 19 分钟前 · 0 分支」「Obsidian 空闲 · 11 分钟前 · 0 分支」 |
+| 控制台 | 0 pageerror；两个 404 是 DSH 自己的 `api/changes.summary`（`ui-deliverables`），本插件 0 引用 |
+
+顺带把**卸载侧**也跑成往返：`dsh plugin --profile web-0.1.7 remove dsh-canvas` → 重启 → tab 条回到 `[对话, 轨迹]`、全文 0 处 `dsh-canvas`、0 节点、0 报错 → 重装 → 重启 → `[对话, 轨迹, 画布]`、3 节点、0 报错，profile 副本与 `lib/client.js` 逐字节一致，m0-check 11/11。
+
+证据截图（本地 `.verify/`，未提交）：`06-canvas-tab.png`（画布渲染）、`07-after-remove.png`（卸载后）、`08-after-reinstall.png`（重装后）。
+
+**仍未验证**：桌面 App 里同一幕（需用户重启 App，见上一节）；`retainInfo().retainedBy.canvasNode` 在真实卸载后归零（关卡 11 的实测残留）。
 
 ## 桌面 profile（用户实际使用的那个）
 
@@ -149,8 +168,10 @@ cd "D:/deepseek harness" && corepack pnpm dsh web-0.1.7 --port 3090 --no-open   
 
 ## 下一步（剩余未跑项）
 
-1. 用带鉴权的浏览器打开 `http://127.0.0.1:3090/?token=…`，确认 tab 条出现「画布」，`dsh plugin --profile web-0.1.7 remove dsh-canvas` 后重启确认消失（关卡 1 DOM 部分 + 关卡 11 残留）。桌面 App 则重启后目视 tab 条。
-2. ~~造一个带排队消息的会话，验证关卡 4。~~ 已以 SRC 口径完成（见「关卡 4」节）；若要升到真实证据，只需一次真实分叉 + 观察子会话无 turn/start。
-3. ~~断网/重连验证关卡 9。~~ flap 语义已有单测；transport 层重连属 host 行为，画布侧无可断言。
-4. ~~生成 500 节点 fixture 测关卡 10。~~ 已完成（见「关卡 10」节）。
-5. 发布阻塞：npm 上 `dsh-canvas` 包名已被占用，需改为 `@<scope>/dsh-canvas`（同步 package.json name / cordis.patch.yml / PLUGIN_ID），scope 待用户决定。
+1. 桌面 App 重启后目视 tab 条是否出现「画布」（与 web 侧机理相同，已双份验证，只是 App 无端口可自动探）。
+2. 卸载后 `retainInfo().retainedBy.canvasNode` 归零的实测（关卡 11 的残留部分）——DOM 往返已证明 tab 与节点干净消失，retain 记账需 host 侧查询。
+3. ~~用带鉴权的浏览器打开 `http://127.0.0.1:3090/?token=…`，确认 tab 条出现「画布」~~ **已完成**，见「关卡 1 的 DOM 级证据」节。
+4. ~~造一个带排队消息的会话，验证关卡 4。~~ 已以 SRC 口径完成（见「关卡 4」节）；若要升到真实证据，只需一次真实分叉 + 观察子会话无 turn/start。
+5. ~~断网/重连验证关卡 9。~~ flap 语义已有单测；transport 层重连属 host 行为，画布侧无可断言。
+6. ~~生成 500 节点 fixture 测关卡 10。~~ 已完成（见「关卡 10」节）。
+7. 发布阻塞：npm 上 `dsh-canvas` 包名已被占用，需改为 `@<scope>/dsh-canvas`（同步 package.json name / cordis.patch.yml / PLUGIN_ID），scope 待用户决定。
