@@ -12,24 +12,46 @@ interface FakeOptions {
   readonly forkRejects?: string
   readonly forkReturnsUndefined?: boolean
   readonly onCreatedFires?: boolean
-  readonly scanned?: string
+  /** Children the parent already had before this fork. */
+  readonly existingChildren?: readonly string[]
+  readonly created?: string
+  /** Siblings created by the same window, used to force an ambiguous recovery. */
+  readonly extraCreated?: readonly string[]
+  /** The fork threw only after the child was catalogued (a lost receipt). */
+  readonly lostReceipt?: boolean
+  readonly childrenThrows?: boolean
   readonly outcomes?: readonly PromptOutcome[]
   readonly usingThrows?: string
 }
 
 const makeDeps = (options: FakeOptions = {}) => {
+  const created = options.created ?? 'child'
   const sent: { text: string; requestId: string }[] = []
   let call = 0
+  let forked = false
+
   const fork = vi.fn(async (req: { onCreated?: (id: string) => void }) => {
-    if (options.onCreatedFires !== false) req.onCreated?.('child')
+    const creates = options.forkRejects === undefined || options.lostReceipt === true
+    if (creates) {
+      forked = true
+      if (options.onCreatedFires !== false) req.onCreated?.(created)
+    }
     if (options.forkRejects !== undefined) throw new Error(options.forkRejects)
     if (options.forkReturnsUndefined === true) return undefined as unknown as string
-    return 'child'
+    return created
   })
-  const findChildByScan = vi.fn(async () => options.scanned)
+
+  const childrenOf = vi.fn(async () => {
+    if (options.childrenThrows === true) throw new Error('session list unavailable')
+    const before = [...(options.existingChildren ?? [])]
+    // Pre-existing children come first, so a naive "first child of the parent"
+    // would pick one of them rather than the child this fork created.
+    return forked ? [...before, created, ...(options.extraCreated ?? [])] : before
+  })
+
   const deps: ForkDeps = {
     fork,
-    findChildByScan,
+    childrenOf,
     using: async (sessionId, op) => {
       if (options.usingThrows !== undefined) throw new Error(options.usingThrows)
       return op(async (text, requestId) => {
@@ -41,7 +63,7 @@ const makeDeps = (options: FakeOptions = {}) => {
     },
     newRequestId: () => 'generated-id',
   }
-  return { deps, fork, findChildByScan, sent }
+  return { deps, fork, childrenOf, sent }
 }
 
 const req = (extra: Record<string, unknown> = {}) =>
@@ -62,22 +84,52 @@ describe('runForkTransaction', () => {
   it('keeps the child when the fork rejects only because the title rename failed', async () => {
     // fork() observes the catalogued child via onCreated BEFORE the optional
     // rename, and rejects when that rename fails after creation. A captured id
-    // therefore proves the child exists, so no scan and no re-fork.
-    const fake = makeDeps({ forkRejects: 'rename failed' })
+    // therefore proves the child exists, so the list is not even re-read.
+    const fake = makeDeps({ forkRejects: 'rename failed', lostReceipt: true })
     const result = await runForkTransaction(fake.deps, req())
     expect(result).toEqual({ childId: 'child', phase: 'done', retriedPrompt: false })
     expect(fake.fork).toHaveBeenCalledTimes(1)
-    expect(fake.findChildByScan).not.toHaveBeenCalled()
+    expect(fake.childrenOf).toHaveBeenCalledTimes(1)
     expect(fake.sent).toHaveLength(1)
   })
 
-  it('recovers a lost fork receipt by scanning, and still forks exactly once', async () => {
-    const fake = makeDeps({ forkRejects: 'ECONNRESET', onCreatedFires: false, scanned: 'recovered' })
+  it('recovers a lost fork receipt by diffing the parent\u2019s children', async () => {
+    const fake = makeDeps({ forkRejects: 'ECONNRESET', lostReceipt: true, onCreatedFires: false })
     const result = await runForkTransaction(fake.deps, req())
-    expect(result).toEqual({ childId: 'recovered', phase: 'done', retriedPrompt: false })
+    expect(result).toEqual({ childId: 'child', phase: 'done', retriedPrompt: false })
     expect(fake.fork).toHaveBeenCalledTimes(1)
-    expect(fake.findChildByScan).toHaveBeenCalledWith('src')
+    expect(fake.childrenOf).toHaveBeenCalledTimes(2)
     expect(fake.sent).toEqual([{ text: 'go', requestId: 'req-1' }])
+  })
+
+  it('never mistakes a pre-existing branch for the one this fork created', async () => {
+    // A parent on a canvas almost always already has children. Picking "a child
+    // of the parent" would return a pre-existing branch and deliver the prompt
+    // to the wrong session; only the before/after difference is evidence.
+    const fake = makeDeps({
+      forkRejects: 'ECONNRESET',
+      lostReceipt: true,
+      onCreatedFires: false,
+      existingChildren: ['old-1', 'old-2'],
+    })
+    const result = await runForkTransaction(fake.deps, req())
+    expect(result.childId).toBe('child')
+    expect(result.childId).not.toBe('old-1')
+    expect(fake.sent).toEqual([{ text: 'go', requestId: 'req-1' }])
+  })
+
+  it('refuses to guess when several new children appeared at once', async () => {
+    const fake = makeDeps({
+      forkRejects: 'ECONNRESET',
+      lostReceipt: true,
+      onCreatedFires: false,
+      extraCreated: ['other-1', 'other-2'],
+    })
+    const result = await runForkTransaction(fake.deps, req())
+    expect(result.phase).toBe('unverified')
+    expect(result.childId).toBe('')
+    expect(fake.fork).toHaveBeenCalledTimes(1)
+    expect(fake.sent).toHaveLength(0)
   })
 
   it('reports unverified when a lost receipt cannot be confirmed, and never re-forks', async () => {
@@ -87,6 +139,13 @@ describe('runForkTransaction', () => {
     expect(result.childId).toBe('')
     expect(result.error).toBe('ECONNRESET')
     expect(fake.fork).toHaveBeenCalledTimes(1)
+    expect(fake.sent).toHaveLength(0)
+  })
+
+  it('reports unverified when the session list cannot be read at all', async () => {
+    const fake = makeDeps({ forkRejects: 'boom', onCreatedFires: false, childrenThrows: true })
+    const result = await runForkTransaction(fake.deps, req())
+    expect(result.phase).toBe('unverified')
     expect(fake.sent).toHaveLength(0)
   })
 

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { segmentFromEvents, type SessionEventLike } from '../src/client/compare/branch-segment.ts'
+import {
+  inheritedPrefixLength,
+  segmentFromEvents,
+  type SessionEventLike,
+} from '../src/client/compare/branch-segment.ts'
 
 const ev = (seq: number, type: string, data?: unknown): SessionEventLike => ({ seq, type, data })
 
@@ -8,6 +12,34 @@ const userMessage = (text: string, kind = 'user') =>
 
 const assistantMessage = (text: string) =>
   ({ turn: 1, step: 1, message: { role: 'assistant', content: [{ type: 'text', text }], source: { kind: 'model' } }, stream: [] })
+
+describe('inheritedPrefixLength', () => {
+  it('reads the inherited prefix off the seed marker', () => {
+    // The marker sits AT the cut, and inheritedEventCount is boundary + 1.
+    expect(inheritedPrefixLength([
+      ev(0, 'turn/start', { turn: 1 }),
+      ev(4, 'session/end-seed', { inherited: true }),
+      ev(5, 'turn/end', { turn: 1, reason: { kind: 'forked' } }),
+    ])).toBe(5)
+  })
+
+  it('is zero for a session that was never forked', () => {
+    expect(inheritedPrefixLength([ev(0, 'turn/start', { turn: 1 })])).toBe(0)
+    expect(inheritedPrefixLength([])).toBe(0)
+  })
+
+  it('uses the last tagged marker, which is the current cut', () => {
+    expect(inheritedPrefixLength([
+      ev(2, 'session/end-seed', { inherited: true }),
+      ev(9, 'session/end-seed', { inherited: true }),
+    ])).toBe(10)
+  })
+
+  it('ignores untagged markers, which are ordinary restore boundaries', () => {
+    expect(inheritedPrefixLength([ev(7, 'session/end-seed', {})])).toBe(0)
+    expect(inheritedPrefixLength([ev(7, 'session/end-seed', undefined)])).toBe(0)
+  })
+})
 
 describe('segmentFromEvents', () => {
   it('keeps only events at or after the inherited count', () => {

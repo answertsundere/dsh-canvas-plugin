@@ -27,6 +27,15 @@ export interface CanvasModel {
   search(text: string): void
   /** Optional: the toolbar only shows 刷新 when the controller supplies one. */
   refresh?(): void
+  /**
+   * Optional invalidation channel.
+   *
+   * The slot hands the tab one model object for the tab's lifetime, so the tab
+   * cannot rely on being re-rendered with fresh props. The controller's model
+   * exposes its state through getters and calls this on every change, which is
+   * what keeps the canvas live. Tests can omit it and pass plain values.
+   */
+  subscribe?(listener: () => void): () => void
 }
 
 export const IDENTITY_VIEW: CanvasView = { x: 0, y: 0, scale: 1 }

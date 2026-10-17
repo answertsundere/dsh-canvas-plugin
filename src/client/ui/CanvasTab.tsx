@@ -1,4 +1,7 @@
-import { useRef, useState, type CSSProperties, type FC, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  useEffect, useReducer, useRef, useState,
+  type CSSProperties, type FC, type MouseEvent as ReactMouseEvent,
+} from 'react'
 import type { SessionId } from '../../shared/contracts.ts'
 import { theme } from '../theme.ts'
 import { layoutLayered, type LayoutPoint } from '../graph/graph-layout.ts'
@@ -20,6 +23,12 @@ const FIT_VIEWPORT = { width: 1000, height: 600 }
 export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   const [query, setQuery] = useState('')
   const drag = useRef<{ startX: number; startY: number; viewX: number; viewY: number } | null>(null)
+  const [, bump] = useReducer((tick: number) => tick + 1, 0)
+
+  // The slot hands the tab a single model object for its lifetime, so live
+  // updates arrive through the model's own invalidation channel rather than
+  // through new props.
+  useEffect(() => canvas?.subscribe?.(() => { bump() }), [canvas])
 
   if (canvas === undefined) {
     return (

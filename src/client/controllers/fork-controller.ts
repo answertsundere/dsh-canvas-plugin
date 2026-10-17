@@ -38,7 +38,16 @@ export interface ForkDeps {
     increaseTitle: boolean
     onCreated?: (childId: string) => void
   }): Promise<string>
-  findChildByScan(parentId: string): Promise<string | undefined>
+  /**
+   * The children of `parentId` currently known to the list snapshot.
+   *
+   * Diffing this across the fork — rather than just listing the parent's
+   * children — is what makes receipt-loss recovery safe. A parent on a canvas
+   * almost always *already* has children, because branching is the point; taking
+   * "a child of the parent" would return a pre-existing branch and the prompt
+   * would be delivered to the wrong session.
+   */
+  childrenOf(parentId: string): Promise<readonly string[]>
   using<T>(
     sessionId: string,
     op: (send: (text: string, requestId: string) => Promise<PromptOutcome>) => Promise<T>,
@@ -96,6 +105,10 @@ export async function runForkTransaction(
 
   const requestId = req.requestId ?? deps.newRequestId()
 
+  // Snapshot the parent's children BEFORE forking: the difference afterwards is
+  // the only reliable evidence of which child this fork created.
+  const knownChildren = await childrenOf(deps, req.sessionId) ?? []
+
   let observed: string | undefined
   let resolved: string | undefined
   let forkError: unknown
@@ -113,11 +126,17 @@ export async function runForkTransaction(
   // A captured child proves creation even when the call threw (rename failure).
   let childId = resolved ?? observed
   if (childId === undefined) {
-    childId = await deps.findChildByScan(req.sessionId)
-    if (childId === undefined) {
+    const after = await childrenOf(deps, req.sessionId)
+    const fresh = after === undefined ? undefined : after.filter(id => !knownChildren.includes(id))
+    if (fresh !== undefined && fresh.length === 1 && fresh[0] !== undefined) {
+      childId = fresh[0]
+    } else {
+      // Zero new children, an unreadable list, or several new children are all
+      // "cannot confirm": report it rather than guess at a session to prompt.
+      const unknown = fresh === undefined || fresh.length > 1
       return {
         childId: '',
-        phase: looksLikeLostReceipt(forkError) ? 'unverified' : 'failed',
+        phase: unknown || looksLikeLostReceipt(forkError) ? 'unverified' : 'failed',
         ...(forkError === undefined ? {} : { error: describe(forkError) }),
         retriedPrompt: false,
       }
@@ -133,6 +152,15 @@ export async function runForkTransaction(
   if (second.ok) return { childId, phase: 'done', retriedPrompt: true }
 
   return { childId, phase: 'failed', error: second.error, retriedPrompt: true }
+}
+
+/** A list read that fails must not turn into a guess; `undefined` means "unknown". */
+async function childrenOf(deps: ForkDeps, parentId: string): Promise<readonly string[] | undefined> {
+  try {
+    return await deps.childrenOf(parentId)
+  } catch {
+    return undefined
+  }
 }
 
 async function sendOnce(

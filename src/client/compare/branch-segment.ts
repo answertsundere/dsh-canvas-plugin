@@ -20,6 +20,27 @@ import type { BranchSegment, BranchTurn } from '../../shared/contracts.ts'
  * error | max-tokens | interrupted | forked`).
  */
 
+/**
+ * The inherited prefix length of a fork child, read from its own event log.
+ *
+ * A fork child owns exactly one `session/end-seed { inherited: true }` marker
+ * **at** its cut (`core/session/src/fork.ts`, `core/session/src/types.ts`), and
+ * DSH's `inheritedEventCount` is `boundary + 1` for that same inclusive
+ * boundary. Reading the marker keeps the number consistent with the log instead
+ * of depending on a field the client surface does not expose. A session that was
+ * never forked has no marker and therefore inherits nothing.
+ */
+export function inheritedPrefixLength(events: readonly SessionEventLike[]): number {
+  let length = 0
+  for (const event of events) {
+    if (event.type !== 'session/end-seed') continue
+    if (!isRecord(event.data) || event.data.inherited !== true) continue
+    if (!Number.isFinite(event.seq)) continue
+    length = event.seq + 1
+  }
+  return length
+}
+
 export interface SessionEventLike {
   readonly seq: number
   readonly type: string

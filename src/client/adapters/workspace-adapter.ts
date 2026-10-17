@@ -17,6 +17,34 @@ export interface WorkspaceSelection {
 }
 
 /**
+ * Narrows a workspace snapshot into the rows this adapter reads.
+ *
+ * Accepts the client `WorkspaceSnapshot` (`{ items }`) or a bare array, and
+ * drops rows without a usable `workspaceId` rather than inventing one.
+ */
+export function toWorkspaceItems(snapshot: unknown): WorkspaceItemLike[] {
+  const rows = Array.isArray(snapshot)
+    ? snapshot
+    : typeof snapshot === 'object' && snapshot !== null && Array.isArray((snapshot as { items?: unknown }).items)
+      ? (snapshot as { items: unknown[] }).items
+      : []
+  const items: WorkspaceItemLike[] = []
+  for (const row of rows) {
+    if (typeof row !== 'object' || row === null) continue
+    const candidate = row as Record<string, unknown>
+    if (typeof candidate.workspaceId !== 'string' || candidate.workspaceId === '') continue
+    items.push({
+      workspaceId: candidate.workspaceId,
+      ...(typeof candidate.path === 'string' ? { path: candidate.path } : {}),
+      ...(Array.isArray(candidate.sessionIds)
+        ? { sessionIds: candidate.sessionIds.filter((id): id is string => typeof id === 'string') }
+        : {}),
+    })
+  }
+  return items
+}
+
+/**
  * Resolves which sessions belong on the canvas for the current workspace.
  *
  * Membership is the union of two sources, not one:

@@ -41,23 +41,84 @@ const model = (over: Partial<CanvasModel> = {}): CanvasModel => ({
   ...over,
 })
 
+/** One raw client list row, as the session store actually stores it. */
+const listRow = (id: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  displayTitle: id,
+  running: false,
+  retainedBy: {},
+  blank: false,
+  updatedAt: 0,
+  ...extra,
+})
+
+/** A ctx just real enough for `apply`: the slot, the locale, and the two snapshots. */
+const fakeCtx = () => {
+  const register = vi.fn()
+  const injectSlots = vi.fn((_slot: string, fn: () => void) => { fn(); return () => {} })
+  const locale = { register: vi.fn(), bind: () => (key: string) => key }
+  const effect = vi.fn((fn: () => unknown) => fn())
+  const sessions = {
+    list: {
+      getSnapshot: () => ({
+        ids: ['a'],
+        byId: { a: listRow('a', { cwd: 'C:/w', title: 'Alpha' }) },
+        phase: 'ready',
+        projectionsBySession: {},
+      }),
+      subscribe: () => () => {},
+    },
+    fork: vi.fn(),
+    using: vi.fn(),
+    retain: vi.fn(),
+  }
+  const workspaces = {
+    list: {
+      getSnapshot: () => ({
+        items: [{ workspaceId: 'w1', path: 'C:/w', title: 'w1', sessionIds: ['a'] }],
+        phase: 'ready',
+      }),
+      subscribe: () => () => {},
+    },
+  }
+  return { ctx: { effect, slots: { inject: injectSlots, register }, locale, sessions, workspaces }, register, injectSlots }
+}
+
 describe('canvas client plugin', () => {
   it('declares the services it needs', () => {
     expect(inject).toEqual(expect.arrayContaining(['slots', 'sessions', 'uiConversation', 'locale']))
   })
 
   it('registers the canvas conversation.view with id canvas and order 20', () => {
-    const register = vi.fn()
-    const injectSlots = vi.fn((_slot: string, fn: () => void) => { fn(); return () => {} })
-    const locale = { register: vi.fn(), bind: () => (key: string) => key }
-    const effect = vi.fn((fn: () => unknown) => { fn() })
-    const ctx = { effect, slots: { inject: injectSlots, register }, locale }
-    apply(ctx as never)
-    expect(injectSlots).toHaveBeenCalledWith('conversation.view', expect.any(Function))
-    const [options, component] = register.mock.calls[0] as never as [{ id: string; order: number }, unknown]
+    const fake = fakeCtx()
+    apply(fake.ctx as never)
+    expect(fake.injectSlots).toHaveBeenCalledWith('conversation.view', expect.any(Function))
+    const [options, component] = fake.register.mock.calls[0] as never as [{ id: string; order: number }, unknown]
     expect(options.id).toBe('canvas')
     expect(options.order).toBe(20)
     expect(component).toBe(CanvasTab)
+  })
+
+  it('injects a live controller model rather than an empty placeholder', () => {
+    const fake = fakeCtx()
+    apply(fake.ctx as never)
+    const options = fake.register.mock.calls[0]?.[0] as unknown as {
+      inject(sessionId: string): { canvas: CanvasModel }
+    }
+    const { canvas } = options.inject('a')
+    expect([...canvas.graph.nodes.keys()]).toEqual(['a'])
+    expect(canvas.statusOf('a').kind).toBe('idle')
+    expect(typeof canvas.subscribe).toBe('function')
+  })
+
+  it('hands the same model back for the same conversation', () => {
+    const fake = fakeCtx()
+    apply(fake.ctx as never)
+    const options = fake.register.mock.calls[0]?.[0] as unknown as {
+      inject(sessionId: string): { canvas: CanvasModel }
+    }
+    // A new model per render would drop the tab's subscription every time.
+    expect(options.inject('a').canvas).toBe(options.inject('a').canvas)
   })
 })
 
