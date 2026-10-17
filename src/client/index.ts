@@ -1,8 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller/types'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { NS, en, zh } from './locales.ts'
 import { CanvasTab } from './ui/CanvasTab.tsx'
 import { CANVAS_RETAIN_SOURCE } from './adapters/event-stream-adapter.ts'
@@ -16,23 +20,25 @@ import type { SessionEventLike } from './compare/branch-segment.ts'
 export const inject = ['slots', 'sessions', 'workspaces', 'uiWorkspace', 'uiConversation', 'locale']
 
 /**
- * The DSH boundary. Everything below this file is written against plain strings
- * and structural interfaces; DSH brands `SessionId`, so the casts live here and
- * nowhere else.
+ * The canonical retain-label extension every DSH client plugin declares
+ * (ui-workspace → workspaceOperation, ui-goal → goalActivation, …). The
+ * packages above are devDependencies so the `/client` modules resolve and the
+ * merge is checked — `retainOptions` needs no cast because 'canvasNode' is a
+ * key of `SessionReferenceSourceMap` here.
  */
-const asSessionId = (id: string): SessionId => id as unknown as SessionId
+declare module '@deepseek-ai/dsh-api-session-controller/client' {
+  interface SessionReferenceSourceMap {
+    /** Canvas node reads: one-shot event windows and forked-branch prompts. */
+    canvasNode: unknown
+  }
+}
 
 /**
- * `ctx.sessions.retain`/`using` take a `SessionReferenceSource`, a closed union
- * that DSH expects each plugin to extend by declaration merge. That merge needs
- * `@deepseek-ai/dsh-api-session-controller` as a dependency, which this package
- * does not have, so the label is cast at the boundary instead. It is a plain
- * string at runtime — the retention record is keyed by it — so the behaviour is
- * unaffected; only the type is borrowed. Adding the dependency restores the
- * merge (see the ledger note on Task 5).
+ * The DSH boundary. Everything below this file is written against plain strings
+ * and structural interfaces; DSH brands `SessionId`/`SessionRequestId`, so the
+ * brand casts live here and nowhere else.
  */
-type RetainOptions = Parameters<Context['sessions']['retain']>[1]
-const retainOptions = { source: CANVAS_RETAIN_SOURCE } as unknown as RetainOptions
+const asSessionId = (id: string): SessionId => id as unknown as SessionId
 
 export function apply(ctx: Context): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-canvas: dictionaries')
@@ -101,12 +107,12 @@ function depsFor(ctx: Context, sessionId: string): GraphControllerDeps {
       increaseTitle: request.increaseTitle,
       ...(request.onCreated === undefined
         ? {}
-        : { onCreated: childId => request.onCreated?.(childId as unknown as string) }),
+        : { onCreated: childId => request.onCreated?.(childId) }),
     }),
     childrenOf: async parentId => toSummaries(ctx.sessions.list.getSnapshot())
       .filter(summary => summary.parentId === parentId)
       .map(summary => summary.id),
-    using: (id, op) => ctx.sessions.using(asSessionId(id), retainOptions, async reference =>
+    using: (id, op) => ctx.sessions.using(asSessionId(id), { source: CANVAS_RETAIN_SOURCE }, async reference =>
       op(async (text, requestId) => {
         // `requestId` is the FOURTH parameter, after `signal`. Passing it third
         // would land it in `signal`, drop it, and silently disable the Host's
@@ -115,7 +121,7 @@ function depsFor(ctx: Context, sessionId: string): GraphControllerDeps {
           [{ type: 'text', text }],
           'queue',
           undefined,
-          requestId as never,
+          requestId as SessionRequestId,
         )
         // prompt() resolves a RemoteResult; it does not reject on a refusal.
         return result.ok
@@ -135,19 +141,12 @@ function depsFor(ctx: Context, sessionId: string): GraphControllerDeps {
       const snapshot = ctx.sessions.list.getSnapshot() as unknown as { phase?: unknown; state?: unknown }
       return snapshot.phase === 'ready' && snapshot.state !== 'error'
     },
-    openSession: id => {
-      // `uiWorkspace` is declared by `@deepseek-ai/dsh-client-ui-workspace`,
-      // which is not a dependency here; the service is real (it is listed in
-      // `inject`, and DSH validates injected services at boot), only its type
-      // augmentation is missing.
-      ;(ctx as unknown as { uiWorkspace: { openSession(id: SessionId): void } })
-        .uiWorkspace.openSession(asSessionId(id))
-    },
+    openSession: id => ctx.uiWorkspace.openSession(asSessionId(id)),
     forkDeps,
     readEvents: async id => {
       // A one-shot retain: comparison reads the window and lets go immediately,
       // so nothing stays pinned open after the panel closes.
-      const reference = ctx.sessions.retain(asSessionId(id), retainOptions)
+      const reference = ctx.sessions.retain(asSessionId(id), { source: CANVAS_RETAIN_SOURCE })
       try {
         const binding = await reference.ready
         const events: SessionEventLike[] = []

@@ -807,7 +807,32 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 - **A blank session renders no tab strip — host behavior, not a plugin defect.** `showTabs = !hideChrome && tabs.length > 1` (`packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx:66`), and `hideChrome` is true while `session.blank && conversationPhase === 'blank'` (`ConversationHeader.tsx:15-24`). A brand-new empty session shows no tab strip at all, so DOM verification must open a session that already has messages. Anyone re-running gate 1 will hit this first.
 - On the user's real session the strip `[data-conversation-tabs]` renders **对话（选中）｜轨迹｜画布**; clicking 画布 mounts the canvas with `data-canvas-node × 3` — real cards with 空闲 status, relative times and 0 分支. Zero pageerror; the two 404s are DSH's own `api/changes.summary` (`ui-deliverables`), which the plugin never calls (grep: 0 matches in `src`).
 - Full round trip: remove → reboot → strip back to `[对话|轨迹]`, 0 occurrences of `dsh-canvas` in the document, 0 nodes, 0 errors; reinstall → reboot → strip back with 画布, 3 nodes, 0 errors, profile copy byte-identical, m0-check 11/11. Evidence screenshots live in `.verify/` (gitignored — they show the user's private workspace).
-- Tooling note: the boot log prints the auth token (`dsh web: http://127.0.0.1:3090/?token=…`) only when its output is **not** piped through `tail`; Playwright 1.60.0 is available inside `D:/npm-global/node_modules/wigolo` with chromium-1223 in `%LOCALAPPDATA%\ms-playwright`.
+- Tooling note: the boot log prints the auth token (`dsh web: http://127.0.0.1:3090/?token=…`) only when its output is **not** piped through `tail`; Playwright 1.60.0 is available inside `D:/npm-global/node_modules/wigolo` with chromium-1223 in `%LOCALAPPDATA%/ms-playwright`.
+
+---
+
+### Task 16: type-merge cleanup — the deferred Task 5/11/13 debt (2026-10-17, post-handoff)
+
+**Files:** `package.json`, `.npmrc` (new), `src/client/index.ts`, `src/client/adapters/event-stream-adapter.ts`
+
+**What was added and why (all verified against the installed `0.2.0-rc.2` copies, which are byte-equal to the checkout):**
+- Three devDependencies, exact-pinned like the rest: `@deepseek-ai/dsh-api-session-controller`, `@deepseek-ai/dsh-api-workspace-controller`, `@deepseek-ai/dsh-client-ui-workspace`. Each owns one `declare module '@deepseek-ai/cordis'` Context service the plugin injects:
+  - `Context.sessions: ISessions` ← `dsh-api-session-controller` `/client` entry (`packages/api/session-controller/src/client/index.ts`, the merge block after `SessionReferenceSourceMap`);
+  - `Context.workspaces: IWorkspaces` ← `dsh-api-workspace-controller` `/client` entry (`lib/types/client/index.d.ts:17-21` of the published copy);
+  - `Context.uiWorkspace: UiWorkspace` ← `dsh-client-ui-workspace` `client/navigation.ts:109-114`. Task 11's note that "the two `dsh-api-*` devDependencies restore both merges" was imprecise here: `api-workspace-controller` declares `workspaces`, not `uiWorkspace` — the `uiWorkspace` merge lives in `dsh-client-ui-workspace`, exactly where `index.ts`'s old cast comment said.
+- The retain-label merge, copied verbatim from the canonical pattern (`packages/client/ui-workspace/src/client/index.ts:79-84`): `declare module '@deepseek-ai/dsh-api-session-controller/client' { interface SessionReferenceSourceMap { canvasNode: unknown } }`, plus `CANVAS_RETAIN_SOURCE = 'canvasNode' as const` so the literal is a key of the merged map.
+
+**Casts removed (3) and what remains (2, by design):**
+- Removed: the `retainOptions as unknown as RetainOptions` helper (its whole `Parameters<…>[1]` machinery goes with it; both call sites now pass `{ source: CANVAS_RETAIN_SOURCE }` directly); the `childId as unknown as string` unbrand (a branded `SessionId` is `string & {…}`, already assignable to `string` — the cast was noise); the `ctx as unknown as { uiWorkspace }` service cast.
+- Remaining in `src/client/index.ts` (the sanctioned boundary file): `asSessionId` and `requestId as SessionRequestId`. Neither brand has a public minter: `SessionRequestId = Branded<'session-request-id'>` is type-only (`packages/api/session-controller/src/types.ts:398`; `Branded` in `@deepseek-ai/dsh-brand/lib/types/index.d.ts:25` exports no function), and although `@deepseek-ai/dsh-session/types` exports a runtime `SessionId(id)` minter, using it would pull host-package runtime code into the client bundle for zero benefit. Brand casts at the boundary are the idiom AGENTS.md already sanctions.
+- A forensic note for the record: **before this task, `Context['sessions']` already resolved to the real `ISessions`** — through `@deepseek-ai/dsh`'s transitive pnpm-store copies (pnpm truncates store dir names, e.g. `@deepseek-ai+dsh-api-sessio_737ba…`, which is why a plain `ls | grep session-controller` finds nothing). The types flowed, but a `declare module` written in plugin source could not resolve top-level (TS2664), which is what Task 5 hit. The devDependencies make the resolution explicit instead of transitive.
+
+**A third pnpm-11 trap, discovered the hard way while adding them:**
+- `C:\Users\sshuser\pnpm-workspace.yaml` exists (it contains only unanswered `allowBuilds` placeholders, no `packages:` list). pnpm 11 walks up from the cwd to the nearest `pnpm-workspace.yaml` and treats that directory as the workspace root — so a bare `pnpm add` in the plugin repo silently wrote the new deps into **home's** `pnpm-lock.yaml` as an importer `Desktop/dsh-canvas-plugin`, symlinked them from **home's** virtual store, and left the project's own lockfile untouched. Nothing errors; the project just ends up with a hybrid `node_modules`.
+- Cleanup performed: importer block removed from home's lockfile (home is a real project — `inhe-control-console` — not scratch), stray symlinks deleted, reinstall redone correctly. pnpm's own next run pruned ~600 now-orphaned store entries at home and rewrote its lockfile cleanly (verified: importers back to `.` only).
+- Pinned permanently: `.npmrc` with `ignore-workspace=true` in the repo root, so no future pnpm command in this repo walks up to home. Commit it with the dependency change.
+
+**Verification:** `pnpm run verify` green (14 files / 175 tests; bundle 76.23 → 76.03 kB, gzip 21.47 → 21.41 kB — comments and casts are the only delta); `install-local.mjs` into `web-0.1.7` and `--profile desktop`; `m0-check.mjs` and `m0-check.mjs desktop` both **11/11** with byte-identical installed copies. Runtime behaviour is unchanged by construction — every edit is type-level or comment-level except `as const` on a string literal.
 
 ---
 

@@ -44,15 +44,26 @@ rough order of risk:
    here silently changes what "compare only the new work" means.
 4. **`uiConversation.binding()` throws** for an unknown or inactive session, so
    it may only be called after a retain has made the session current.
-5. **`ctx.uiWorkspace` and `SessionReferenceSource` have no type augmentation
-   here** because the two `@deepseek-ai/dsh-api-*` packages are not dependencies.
-   Both are cast at the boundary in `src/client/index.ts`.
+5. **The three `declare module` merges are explicit devDependencies** (restored
+   2026-10-17, Task 16): `sessions` ← `@deepseek-ai/dsh-api-session-controller`,
+   `workspaces` ← `@deepseek-ai/dsh-api-workspace-controller`, `uiWorkspace` ←
+   `@deepseek-ai/dsh-client-ui-workspace`, plus the `SessionReferenceSourceMap`
+   `canvasNode` extension in `src/client/index.ts`. If a DSH upgrade moves or
+   renames a `/client` entry, the plugin's augmentation fails to resolve
+   (TS2664) — loud in typecheck, not at runtime. Brand casts (`SessionId`,
+   `SessionRequestId`) remain only in `src/client/index.ts`; neither brand has
+   a public minter.
 6. **The client list row carries neither `createdAt` nor an availability flag.**
    `createdAt` falls back to `updatedAt`, so root ordering is activity-based;
    `available` is always true, which leaves the `failed` status reachable only
    from an explicit error channel.
 7. **`sessionIds` is an accounting list** and can lag a just-created session, so
    workspace membership is the union of `sessionIds` and a `cwd === path` match.
+8. **A stray `pnpm-workspace.yaml` above the repo hijacks every pnpm command.**
+   pnpm 11 walks up to the nearest workspace file and treats that directory as
+   the root — a bare `pnpm add` then writes lockfile entries and symlinks into
+   the wrong project with no error. The repo pins `.npmrc` `ignore-workspace=true`;
+   if that file is ever removed, reinstall from a clean `node_modules`.
 
 ## Not verified
 

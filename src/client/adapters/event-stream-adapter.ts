@@ -14,13 +14,11 @@
  *
  * DSH declares the label set as a declaration-merge-extensible map
  * (`SessionReferenceSourceMap` in `@deepseek-ai/dsh-api-session-controller/client`),
- * which every other plugin extends. This plugin cannot: that package is not a
- * dependency here (Task 1 established that later tasks add no dependencies), so
- * a `declare module` block would be an unresolvable augmentation (TS2664). The
- * label therefore works at runtime — it is only a string key — but is untyped
- * until the merge is added alongside the real dependency in Task 13 packaging.
+ * which every other plugin extends. `src/client/index.ts` extends it the same
+ * way (`declare module` + the package as a devDependency), so this literal is
+ * the typed key of the merge, not just a runtime string.
  */
-export const CANVAS_RETAIN_SOURCE = 'canvasNode'
+export const CANVAS_RETAIN_SOURCE = 'canvasNode' as const
 
 /** History-open lifecycle of a Session event window. */
 export type OpenStateLike = 'cold' | 'loading' | 'open' | 'error'

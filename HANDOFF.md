@@ -13,10 +13,10 @@
 
 | 维度 | 状态 |
 |---|---|
-| 计划任务 | 14/14 完成（Task 1–15b，含 14 桌面 profile、15 关卡收尾、15b 关卡 1 DOM） |
+| 计划任务 | 15/15 完成（Task 1–15b，含 14 桌面 profile、15 关卡收尾、15b 关卡 1 DOM；**16 类型合并清理**——恢复 3 个 `declare module` 合并，消除 3 处断言，补 `.npmrc` workspace 钉死） |
 | 测试 | **14 文件 / 175 测试全绿**（`vitest run`） |
-| 构建 | typecheck 干净；`lib/client.js` 76.23 kB / gzip 21.47 kB，lazy-CJS banner 完好 |
-| 安装 | **两个 profile 都已装**：`web-0.1.7`（开发验证）与 `desktop`（用户实际使用的桌面 App），副本与 `lib/client.js` **逐字节一致**，`m0-check` 均 11/11 |
+| 构建 | typecheck 干净；`lib/client.js` 76.03 kB / gzip 21.41 kB，lazy-CJS banner 完好 |
+| 安装 | **两个 profile 都已装**（Task 16 后已重装）：`web-0.1.7` 与 `desktop` 副本与 `lib/client.js` **逐字节一致**，`m0-check` 均 11/11 |
 | M0 关卡 | 1 **PASS（DOM，含卸载往返）**；2/5/6/7/12 UNIT（2 另有真实数据证据）；4 UNIT+SRC；9 UNIT（flap 语义）；10 **PASS（500 节点实测）**；3 UNIT；8 PARTIAL（未实测并行实况）；11 PARTIAL（retainInfo 残留未实测） |
 | 发布 | **阻塞**：npm 包名 `dsh-canvas` 被占用，需 `@<scope>/dsh-canvas`（见 §7 决策点） |
 
@@ -58,7 +58,7 @@ cd "D:/deepseek harness" && $PFX corepack pnpm dsh web-0.1.7 --port 3090 --no-op
 1. **`file:` 依赖是拷贝不是链接，且版本不变就跳过复制**。改了代码 → 重建 → 直接 `pnpm add`，profile 里还是第一份旧副本，服务端照发旧代码，**任何地方都不报错**。`--force` 也没用。**必须走 `scripts/install-local.mjs`（它会先删 `node_modules/dsh-canvas`）**；`m0-check.mjs` 用逐字节比对兜底。
 2. **DSH API 一律对着本地 checkout 核实**（`D:/deepseek harness`，`639ed01539`），不读线上文档。已验证的关键合同：`fork({sessionId, atSeq, increaseTitle, onCreated})`；`prompt(content, mode, signal?, requestId?)`——**requestId 是第 4 参**，传错位置 Host 去重静默失效；`prompt` 返回 `RemoteResult` 不 reject；`uiConversation.binding()` 对非活跃会话抛错。
 3. **空白会话不渲染 tab 条**：`showTabs = !hideChrome && tabs.length > 1`（`packages/client/ui-conversation/src/client/skeleton/ConversationSession.tsx:66`），blank 会话 `hideChrome=true`。**复跑关卡 1 必须打开有消息的真实会话**，否则会误判成注册失败。
-4. **pnpm 11 的两个坑**：`allowBuilds` 占位符没回答会 `ERR_PNPM_IGNORED_BUILDS`，而 DSH plugin manager **吞掉 pnpm 的 stderr**，只报 "plugin command failed"；pnpm 11 不再读 package.json 的 `pnpm` 字段。
+4. **pnpm 11 的三个坑**：`allowBuilds` 占位符没回答会 `ERR_PNPM_IGNORED_BUILDS`，而 DSH plugin manager **吞掉 pnpm 的 stderr**，只报 "plugin command failed"；pnpm 11 不再读 package.json 的 `pnpm` 字段；**上级目录若有 `pnpm-workspace.yaml`（哪怕只有 allowBuilds 占位符），pnpm 会把那个目录当 workspace root**——lockfile 和符号链接会静默写进错误的项目。仓库根的 `.npmrc`（`ignore-workspace=true`）已钉死此坑，别删。
 5. **桌面 profile 只能走 App 自带 carrier CLI**（`%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd`）：独立 CLI 硬拒 `--profile desktop`（`apps/cli/src/args.ts:83-87`）。且 `execFileSync` + `shell:true` **不给文件参数加引号**，路径含空格会断——传整条命令字符串。
 6. **新增 bundle 行只在 host 启动时读取**，HMR 只覆盖已挂载插件的代码变更——装完插件必须重启 App/服务。
 7. **类型断言只允许出现在 `src/client/index.ts`**（DSH 品牌类型边界）；其余层全部走结构化接口 + 依赖注入，测试用 fake。
@@ -79,7 +79,7 @@ cd "D:/deepseek harness" && $PFX corepack pnpm dsh web-0.1.7 --port 3090 --no-op
 | 2 | **npm 发布 scope 决策** | `dsh-canvas` 包名被占用（有人同名占位）。需用户定 scope 后联动改三处：`package.json` name、`cordis.patch.yml` name、`tsdown.config.ts` 的 `PLUGIN_ID`。**没定之前不要改名**——loader id 是已安装 profile 行的一部分 |
 | 3 | 关卡 11 残留实测 | 卸载后 `retainInfo().retainedBy.canvasNode` 归零（需 host 侧查询）；DOM 往返已证明 tab/节点干净消失 |
 | 4 | 关卡 8 并行实况 | 两个并行分支状态可观察，目前只有单测 + 订阅快照 |
-| 5 | 可选清理 | 加 `@deepseek-ai/dsh-api-session-controller` 依赖可消除 `index.ts` 两处类型断言（同时恢复 `declare module` 合并） |
+| 5 | ~~可选清理：加依赖消除类型断言~~ | **已完成（Task 16，2026-10-17）**：三个 devDep 恢复全部 `declare module` 合并，消除 3 处断言；`index.ts` 仅剩 2 处品牌断言（无公开铸造函数，属边界惯例）。详见 plan 文档 Task 16 节 |
 
 ## 8. 给接管的 AI：建议启动顺序
 
