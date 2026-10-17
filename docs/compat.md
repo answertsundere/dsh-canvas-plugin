@@ -67,6 +67,11 @@ rough order of risk:
 
 ## Not verified
 
-Gates that need an interactive browser or a real session corpus are listed with
-an explicit status in [`m0-verification.md`](m0-verification.md). Gates 4, 9, and
-10 have **not** been run.
+Gates are listed with an explicit PASS / UNIT / SRC / NOT-RUN caliber in
+[`m0-verification.md`](m0-verification.md). As of 2026-10-17 the only gates
+still lacking real-session evidence are **8** (two live parallel branches
+observed on a real run — unit-tested and snapshot-subscribed only) and
+**11** (`retainInfo().retainedBy.canvasNode` back to zero after a real
+uninstall — release paths unit-tested, DOM round trip proven). Gate 1 is PASS
+at the DOM level including the uninstall half; gate 10 is PASS with
+measurements; gate 4 is UNIT+SRC.
