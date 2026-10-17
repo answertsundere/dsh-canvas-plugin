@@ -8,6 +8,7 @@ import {
   type SwarmTodo,
 } from '../swarm/swarm-model.ts'
 import { theme } from '../theme.ts'
+import { RobotAvatar, type RobotState } from './RobotAvatar.tsx'
 
 export interface AgentSwarmViewProps {
   readonly swarm: AgentSwarmState
@@ -42,6 +43,18 @@ const chipStyle = (streaming: boolean): CSSProperties => ({
 
 const statusColor = (status: 'streaming' | 'running' | 'idle'): string =>
   status === 'streaming' ? theme.accent : status === 'running' ? theme.warn : theme.muted
+
+const AGENT_ROBOT: Record<'streaming' | 'running' | 'idle', RobotState> = {
+  streaming: 'working',
+  running: 'working',
+  idle: 'idle',
+}
+
+const TOOL_ROBOT: Record<'pending' | 'ok' | 'error', RobotState> = {
+  pending: 'working',
+  ok: 'done',
+  error: 'failed',
+}
 
 const TODO_GLYPH: Record<SwarmTodo['status'], { glyph: string; color: string }> = {
   completed: { glyph: '✓', color: '#2f9e6f' },
@@ -285,6 +298,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                       stroke={progress === null ? theme.border : theme.accent}
                       strokeWidth={progress === null ? 1.2 : 1.8}
                       opacity={progress === null ? 0.9 : 1}
+                      className={progress === null ? undefined : 'dsh-swarm-hot'}
                     />
                     {progress !== null && (
                       <Comet from={from} to={to} index={tools.length + edgeIndex} progress={progress} attr="data-swarm-pulse" label={`${edge.from}->${edge.to}`} />
@@ -317,6 +331,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                       strokeWidth={progress === null ? 1 : 1.6}
                       strokeDasharray={tool.status === 'pending' ? undefined : '3 4'}
                       opacity={progress === null ? 0.7 : 1}
+                      className={progress === null ? undefined : 'dsh-swarm-hot'}
                     />
                     {progress !== null && (
                       <Comet from={{ x: 0, y: 0 }} to={to} index={toolIndex} progress={progress} attr="data-swarm-pulse" label={`tool:${tool.id}`} />
@@ -342,9 +357,11 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
             return (
               <div key={agent.id} data-swarm-agent={agent.id} style={{ ...chipStyle(agent.status === 'streaming'), left: VIEW.width / 2 + p.x, top: VIEW.height / 2 + p.y }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span
-                    data-swarm-status={agent.status}
-                    style={{ width: 8, height: 8, borderRadius: 4, background: statusColor(agent.status), flex: '0 0 auto' }}
+                  <RobotAvatar
+                    size={26}
+                    color={statusColor(agent.status)}
+                    state={AGENT_ROBOT[agent.status]}
+                    statusAttr={{ name: 'data-swarm-status', value: agent.status }}
                   />
                   <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {agent.label}
@@ -397,7 +414,11 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                   userSelect: 'none',
                 }}
               >
-                <span style={{ color: failed ? '#e0554d' : visual.color, flex: '0 0 auto' }}>{visual.glyph}</span>
+                <RobotAvatar
+                  size={20}
+                  color={failed ? '#e0554d' : visual.color}
+                  state={TOOL_ROBOT[tool.status]}
+                />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.name}</span>
                 <span style={{ flex: '0 0 auto', color: failed ? '#e0554d' : theme.muted }}>
                   {pending ? '…' : failed ? '✗' : '✓'}
@@ -425,12 +446,16 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
               userSelect: 'none',
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 10, height: 10, borderRadius: 5, background: theme.text, flex: '0 0 auto' }} />
-              <span style={{ fontWeight: 700, fontSize: 13 }}>{swarm.rootLabel}</span>
-            </div>
-            <div style={{ color: theme.muted, marginTop: 2 }}>
-              {agents.length} 个 agent · {tools.length} 个工具
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <RobotAvatar size={38} color={theme.text} state={rootHot ? 'working' : 'idle'} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {swarm.rootLabel}
+                </div>
+                <div style={{ color: theme.muted }}>
+                  {agents.length} 个 agent · {tools.length} 个工具
+                </div>
+              </div>
             </div>
             {swarm.rootSnippet !== null && (
               <div

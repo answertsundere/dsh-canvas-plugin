@@ -40,6 +40,28 @@ const CANVAS_CSS = `
   50% { box-shadow: 0 0 18px 3px var(--breath-color); }
 }
 .dsh-canvas-inspect:hover { color: ${theme.text}; border-color: ${theme.accent}; }
+
+/* Worker robots: each node's avatar animates by what it is doing. */
+@keyframes dshRobotBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes dshRobotBreathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.78; } }
+@keyframes dshRobotLed { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+@keyframes dshRobotArmL { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(-16deg); } }
+@keyframes dshRobotArmR { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(16deg); } }
+@keyframes dshRobotShake { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-3deg); } 75% { transform: rotate(3deg); } }
+@keyframes dshDashFlow { to { stroke-dashoffset: -24; } }
+
+.dsh-robot-working { animation: dshRobotBob 1.1s ease-in-out infinite; }
+.dsh-robot-working .dsh-robot-led { animation: dshRobotLed 0.7s ease-in-out infinite; }
+.dsh-robot-working .dsh-robot-arm-l { animation: dshRobotArmL 1.1s ease-in-out infinite; transform-origin: 7px 31px; }
+.dsh-robot-working .dsh-robot-arm-r { animation: dshRobotArmR 1.1s ease-in-out infinite; transform-origin: 33px 31px; }
+.dsh-robot-idle { animation: dshRobotBreathe 3.4s ease-in-out infinite; }
+.dsh-robot-idle .dsh-robot-led { opacity: 0.55; }
+.dsh-robot-done .dsh-robot-eye { fill: #2f9e6f; }
+.dsh-robot-failed { animation: dshRobotShake 0.5s ease-in-out infinite; }
+.dsh-robot-failed .dsh-robot-led { animation: dshRobotLed 0.35s ease-in-out infinite; }
+
+/* A hot thread is a conveyor: dashes flow toward the parent while work runs. */
+.dsh-swarm-hot { stroke-dasharray: 6 6; animation: dshDashFlow 0.8s linear infinite; }
 `
 
 export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {

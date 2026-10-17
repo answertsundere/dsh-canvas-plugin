@@ -150,3 +150,40 @@ describe('ambient sweep on cold edges', () => {
     expect(document.querySelector('[data-swarm-sweep="root->a"]')).toBeNull()
   })
 })
+
+describe('robot avatars', () => {
+  it('every agent and tool is a robot whose state matches what it is doing', () => {
+    render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={NOW} />)
+    // Agent a is streaming -> working; agent b idle -> idle.
+    const agentA = document.querySelector('[data-swarm-agent="a"] [data-robot]')
+    expect(agentA?.getAttribute('data-robot-state')).toBe('working')
+    expect(agentA?.getAttribute('data-swarm-status')).toBe('streaming')
+    const agentB = document.querySelector('[data-swarm-agent="b"] [data-robot]')
+    expect(agentB?.getAttribute('data-robot-state')).toBe('idle')
+    // Tool c1 settled -> done; c2 pending -> working.
+    expect(document.querySelector('[data-swarm-tool="c1"] [data-robot]')?.getAttribute('data-robot-state')).toBe('done')
+    expect(document.querySelector('[data-swarm-tool="c2"] [data-robot]')?.getAttribute('data-robot-state')).toBe('working')
+  })
+
+  it('a failed tool is a shaking red robot', () => {
+    const state = activityState({
+      activity: {
+        turnCount: 1, openTurn: false, currentTurn: null,
+        tools: [{ id: 'x', name: 'pwsh', status: 'error', turn: 1 }],
+        pendingToolId: null,
+      },
+      toolLayout: { positions: new Map([['x', { x: 100, y: -200 }]]) },
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    const robot = document.querySelector('[data-swarm-tool="x"] [data-robot]')
+    expect(robot?.getAttribute('data-robot-state')).toBe('failed')
+    expect((robot?.querySelector('rect') as SVGElement | null)?.getAttribute('fill')).toBe('#e0554d')
+  })
+
+  it('the root has its own robot and a hot thread is a flowing conveyor', () => {
+    render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-root-agent="true"] [data-robot]')).not.toBeNull()
+    expect(document.querySelector('[data-swarm-tool-edge="c2"]')?.getAttribute('class')).toContain('dsh-swarm-hot')
+    expect(document.querySelector('[data-swarm-tool-edge="c1"]')?.getAttribute('class')).toBeNull()
+  })
+})

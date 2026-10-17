@@ -948,6 +948,18 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 24: worker robots — every node is a character with its own rhythm (2026-10-17, user feedback)
+
+**Feedback:** "每一个都是由各种形象的机器人他在工作的时候由相关的动效和律动效果".
+
+**Change:** `RobotAvatar` (inline SVG, no assets) — antenna with an LED, visored head, body with a chest light, two arms. Every node wears one: tools at 20px in their family color, agents at 26px in their status color, the root at 38px. State drives the rhythm via the canvas's injected sheet: **working** robots bob with swinging arms and a blinking antenna LED; **idle** ones breathe slowly with a dim LED; **done** ones stand still with green eyes; **failed** ones shake with a fast red blink (and a red body). Hot threads became conveyors — `dsh-swarm-hot` animates a flowing dash toward the parent while work runs.
+
+**Evidence:** live on the real session — every tool card renders its robot in family color (green shell/job, orange grep, purple write, one red shaking failure), the root card carries its larger robot, turn labels and moving sweep dots intact; 0 pageerrors (`sweep-live.png`).
+
+**Numbers:** 18 files / **275 tests** green; bundle 140.47 kB / gzip 36.67 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔
