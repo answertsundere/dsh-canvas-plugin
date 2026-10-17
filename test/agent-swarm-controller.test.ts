@@ -138,3 +138,64 @@ describe('createAgentSwarmController', () => {
     expect(fake.handles.get('c')!.release).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('root activity in the swarm', () => {
+  it('derives turns and tools from the root window and heats the pending tool', async () => {
+    const fake = makeDeps({ windows: { root: [
+      { type: 'event', event: { type: 'turn/start', seq: 1, data: { turn: 0 } } },
+      { type: 'event', event: { type: 'tool/call', seq: 2, data: { turn: 0, step: 1, callId: 'c1', name: 'read', arguments: '{}' } } },
+      { type: 'event', event: { type: 'tool/result', seq: 3, data: { message: { toolCallId: 'c1' } } } },
+      { type: 'event', event: { type: 'tool/call', seq: 4, data: { turn: 0, step: 2, callId: 'c2', name: 'grep', arguments: '{}' } } },
+    ] } })
+    const controller = createAgentSwarmController(fake.deps, 'root')
+    await flush()
+    const state = controller.state()
+    expect(state.activity.openTurn).toBe(true)
+    expect(state.activity.turnCount).toBe(0)
+    expect(state.activity.tools.map(t => t.name)).toEqual(['read', 'grep'])
+    expect(state.activity.pendingToolId).toBe('c2')
+    expect(state.heat.get('tool:c2')).toBeGreaterThan(0)
+    // The completed tool has no heat: it is not crawling.
+    expect(state.heat.get('tool:c1')).toBeUndefined()
+    controller.dispose()
+  })
+
+  it('a tool that just completed gets one heat stamp, then goes cold', async () => {
+    const fake = makeDeps({ windows: { root: [
+      { type: 'event', event: { type: 'tool/call', seq: 1, data: { turn: 0, step: 1, callId: 'c1', name: 'read', arguments: '{}' } } },
+    ] } })
+    const controller = createAgentSwarmController(fake.deps, 'root')
+    await flush()
+    expect(controller.state().heat.get('tool:c1')).toBeGreaterThan(0)
+
+    fake.handles.get('root')!.setEntries([
+      { type: 'event', event: { type: 'tool/call', seq: 1, data: { turn: 0, step: 1, callId: 'c1', name: 'read', arguments: '{}' } } },
+      { type: 'event', event: { type: 'tool/result', seq: 2, data: { message: { toolCallId: 'c1' } } } },
+    ] as never)
+    fake.handles.get('root')!.emit()
+    await flush()
+    const stamped = controller.state().heat.get('tool:c1')
+    expect(stamped).toBeGreaterThan(0)
+
+    // No further refresh: the crawl finishes and fades.
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(controller.state().heat.get('tool:c1')).toBe(stamped)
+    controller.dispose()
+  })
+
+  it('activity ignores the inherited prefix of a forked session', async () => {
+    const fake = makeDeps({ windows: { root: [
+      { type: 'event', event: { type: 'session/end-seed', seq: 4, data: { inherited: true } } },
+      { type: 'event', event: { type: 'turn/start', seq: 1, data: { turn: 0 } } },
+      { type: 'event', event: { type: 'turn/end', seq: 2, data: { turn: 0, reason: { kind: 'completed' } } } },
+      { type: 'event', event: { type: 'turn/start', seq: 5, data: { turn: 1 } } },
+    ] } })
+    const controller = createAgentSwarmController(fake.deps, 'root')
+    await flush()
+    const state = controller.state()
+    // The inherited turn (seq < 5, before the seed marker) does not count.
+    expect(state.activity.turnCount).toBe(0)
+    expect(state.activity.currentTurn).toBe(1)
+    controller.dispose()
+  })
+})

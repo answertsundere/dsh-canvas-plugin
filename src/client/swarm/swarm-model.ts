@@ -9,6 +9,8 @@
  * swarm, and a freshly spawned agent arrives as an ordinary window change.
  */
 
+import type { LiveEntryLike } from '../live/live-tail.ts'
+
 /** Minimal shape of one window row; identical to the live-tail input. */
 export interface SwarmEntrySource {
   readonly sessionId: string
@@ -173,4 +175,113 @@ export function pulseProgress(lastActivityAt: number, now: number, cycleMs = 1_8
   if (elapsed < 0) return 0
   if (elapsed >= cycleMs + graceMs) return null
   return (elapsed % cycleMs) / cycleMs
+}
+
+/** One tool call the inspected session has made, for the activity ring. */
+export interface ActivityTool {
+  readonly id: string
+  readonly name: string
+  readonly status: 'pending' | 'ok' | 'error'
+  readonly turn: number
+}
+
+/** What the inspected session itself is working through, from its own log. */
+export interface SessionActivity {
+  /** Completed turns. */
+  readonly turnCount: number
+  readonly openTurn: boolean
+  readonly currentTurn: number | null
+  /** Most recent tools, oldest first. */
+  readonly tools: readonly ActivityTool[]
+  readonly pendingToolId: string | null
+}
+
+const EMPTY_ACTIVITY: SessionActivity = {
+  turnCount: 0, openTurn: false, currentTurn: null, tools: [], pendingToolId: null,
+}
+
+const ACTIVITY_TOOL_CAP = 12
+
+/**
+ * The session's own work, folded from its durable events: turn counting plus
+ * `tool/call`→`tool/result` pairing (the same discriminator branch-segment
+ * uses). A long single-agent task shows up here as turns accumulating and a
+ * permanently pending tool while it runs.
+ */
+export function activityFromEntries(entries: readonly LiveEntryLike[], cap = ACTIVITY_TOOL_CAP): SessionActivity {
+  let turnCount = 0
+  let openTurn = false
+  let currentTurn: number | null = null
+  const tools: { id: string; name: string; status: ActivityTool['status']; turn: number }[] = []
+
+  for (const entry of entries) {
+    const row = asRecord(entry)
+    if (row === null || row['type'] !== 'event') continue
+    const event = asRecord(row['event'])
+    if (event === null) continue
+    const data = asRecord(event['data'])
+
+    switch (event['type']) {
+      case 'turn/start': {
+        if (typeof data?.['turn'] === 'number') { openTurn = true; currentTurn = data['turn'] }
+        break
+      }
+      case 'turn/end': {
+        turnCount += 1
+        openTurn = false
+        currentTurn = null
+        break
+      }
+      case 'tool/call': {
+        const callId = data?.['callId']
+        if (typeof callId !== 'string' || callId === '') break
+        tools.push({
+          id: callId,
+          name: typeof data?.['name'] === 'string' ? data['name'] : '…',
+          status: 'pending',
+          turn: typeof data?.['turn'] === 'number' ? data['turn'] : 0,
+        })
+        if (tools.length > cap) tools.shift()
+        break
+      }
+      case 'tool/result': {
+        const message = asRecord(data?.['message'])
+        const callId = message === null ? undefined : message['toolCallId']
+        if (typeof callId !== 'string') break
+        const tool = [...tools].reverse().find(candidate => candidate.id === callId && candidate.status === 'pending')
+        if (tool !== undefined) tool.status = data !== null && data['error'] !== undefined ? 'error' : 'ok'
+        break
+      }
+      default:
+        break
+    }
+  }
+
+  const pending = [...tools].reverse().find(tool => tool.status === 'pending')
+  return {
+    turnCount,
+    openTurn,
+    currentTurn,
+    tools,
+    pendingToolId: pending?.id ?? null,
+  }
+}
+
+/**
+ * The activity ring: tool chips evenly spaced on their own circle outside the
+ * agent ring, so a single-agent session still fills the web with its work.
+ */
+export function layoutActivity(
+  tools: readonly ActivityTool[],
+  radius = 340,
+): { positions: ReadonlyMap<string, { x: number; y: number }> } {
+  const positions = new Map<string, { x: number; y: number }>()
+  tools.forEach((tool, index) => {
+    const angle = -Math.PI / 2 + (2 * Math.PI * index) / Math.max(tools.length, 1)
+    positions.set(tool.id, {
+      x: radius * Math.cos(angle),
+      y: radius * Math.sin(angle),
+    })
+  })
+  return { positions }
 }

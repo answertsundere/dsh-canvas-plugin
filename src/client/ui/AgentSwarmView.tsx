@@ -51,7 +51,9 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
   const now = nowMs ?? tick
 
   const positionOf = (id: string): { x: number; y: number } => swarm.layout.positions.get(id) ?? { x: 0, y: 0 }
+  const toolPositionOf = (id: string): { x: number; y: number } => swarm.toolLayout.positions.get(id) ?? { x: 0, y: 0 }
   const agents = swarm.agents
+  const pendingTool = swarm.activity.tools.find(tool => tool.id === swarm.activity.pendingToolId) ?? null
 
   return (
     <div
@@ -72,7 +74,9 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
         <span style={{ fontWeight: 600 }}>Agent 实况</span>
         <span style={{ color: theme.muted }}>{swarm.rootLabel}</span>
         <span style={{ color: theme.muted }}>
-          {agents.length} 个 agent · {agents.filter(a => a.status !== 'idle').length} 个活跃
+          {swarm.agents.length} 个 agent · 近 {swarm.activity.turnCount + (swarm.activity.openTurn ? 1 : 0)} 轮
+          {swarm.activity.openTurn ? '（进行中）' : ''}
+          {pendingTool !== null ? ` · 正在 ${pendingTool.name}` : ''}
         </span>
         <button
           type="button"
@@ -129,6 +133,32 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                   </g>
                 )
               })}
+              {swarm.activity.tools.map(tool => {
+                const to = toolPositionOf(tool.id)
+                const heatAt = swarm.heat.get(`tool:${tool.id}`)
+                const progress = heatAt === undefined ? null : pulseProgress(heatAt, now)
+                return (
+                  <g key={`tool->${tool.id}`}>
+                    <line
+                      data-swarm-tool-edge={tool.id}
+                      x1={0} y1={0} x2={to.x} y2={to.y}
+                      stroke={progress === null ? theme.border : theme.accent}
+                      strokeWidth={progress === null ? 1 : 1.6}
+                      strokeDasharray={tool.status === 'pending' ? undefined : '3 4'}
+                      opacity={progress === null ? 0.7 : 1}
+                    />
+                    {progress !== null && (
+                      <circle
+                        data-swarm-pulse={`tool:${tool.id}`}
+                        cx={to.x + (0 - to.x) * progress}
+                        cy={to.y + (0 - to.y) * progress}
+                        r={4}
+                        fill={theme.accent}
+                      />
+                    )}
+                  </g>
+                )
+              })}
             </g>
           </svg>
 
@@ -155,6 +185,39 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                     {agent.snippet.text}
                   </div>
                 )}
+              </div>
+            )
+          })}
+
+          {swarm.activity.tools.map(tool => {
+            const p = toolPositionOf(tool.id)
+            const pending = tool.status === 'pending'
+            return (
+              <div
+                key={tool.id}
+                data-swarm-tool={tool.id}
+                data-swarm-tool-status={tool.status}
+                style={{
+                  position: 'absolute',
+                  transform: 'translate(-50%, -50%)',
+                  left: VIEW.width / 2 + p.x,
+                  top: VIEW.height / 2 + p.y,
+                  maxWidth: 170,
+                  padding: '3px 9px',
+                  borderRadius: 8,
+                  background: theme.card,
+                  border: `1px solid ${pending ? theme.accent : tool.status === 'error' ? '#e0554d' : theme.border}`,
+                  boxShadow: pending ? `0 0 12px ${theme.accent}55` : 'none',
+                  color: pending ? theme.text : theme.muted,
+                  font: '11px/1.4 system-ui, sans-serif',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  userSelect: 'none',
+                }}
+              >
+                {pending ? '⚙ ' : tool.status === 'error' ? '✗ ' : '✓ '}
+                {tool.name}
               </div>
             )
           })}

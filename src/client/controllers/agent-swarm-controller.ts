@@ -1,9 +1,14 @@
 import {
+  activityFromEntries,
   agentsFromWindows,
+  layoutActivity,
   layoutSwarm,
   swarmEdges,
+  type ActivityTool,
   type AgentNode,
+  type SessionActivity,
 } from '../swarm/swarm-model.ts'
+import { inheritedPrefixLength, type SessionEventLike } from '../compare/branch-segment.ts'
 import { liveTailFromEntries, tailSnippet, type LiveTail, type TailSnippet } from '../live/live-tail.ts'
 import type { LiveWindowLike } from './graph-controller.ts'
 
@@ -35,10 +40,13 @@ export interface AgentSwarmState {
   readonly agents: readonly AgentSwarmAgent[]
   readonly edges: readonly { from: string; to: string }[]
   readonly layout: ReturnType<typeof layoutSwarm>
+  /** The session's own work (turns and tools), for the activity ring. */
+  readonly activity: SessionActivity
+  readonly toolLayout: ReturnType<typeof layoutActivity>
   /**
-   * Last activity per agent id (its incoming edge's heat). The view feeds
-   * these into `pulseProgress` at each animation frame — the controller never
-   * animates, it only timestamps.
+   * Last activity per node id (agents and `tool:<callId>` entries — each
+   * incoming edge's heat). The view feeds these into `pulseProgress` at each
+   * animation frame — the controller never animates, it only timestamps.
    */
   readonly heat: ReadonlyMap<string, number>
 }
@@ -77,6 +85,8 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
   let nodes: AgentNode[] = []
   let layout = layoutSwarm([], rootId)
   let edges: readonly { from: string; to: string }[] = []
+  let activity: SessionActivity = activityFromEntries([])
+  let toolLayout = layoutActivity([])
   let disposed = false
 
   const notify = (): void => {
@@ -97,11 +107,39 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
     })
   }
 
+  /**
+   * The root's own work, derived from its durable events minus the inherited
+   * prefix (a fork's seed would otherwise count its parent's turns). A pending
+   * tool stays hot while it runs; a tool that just completed gets one heat
+   * stamp so its pulse crawls home and fades.
+   */
+  const updateActivity = (source: LiveWindowLike): void => {
+    const durable = source.entries().filter(entry => entry.type === 'event')
+    const flat: SessionEventLike[] = durable.map(entry => ({
+      seq: Number(entry.event.seq),
+      type: entry.event.type,
+      data: entry.event.data,
+    }))
+    const inherited = inheritedPrefixLength(flat)
+    const own = durable.filter(entry => Number(entry.event.seq) >= inherited)
+    const next = activityFromEntries(own)
+    const now = Date.now()
+    if (next.pendingToolId !== null) heat.set(`tool:${next.pendingToolId}`, now)
+    const previousPending = activity.pendingToolId
+    if (previousPending !== null && previousPending !== next.pendingToolId) {
+      const settled = next.tools.find(tool => tool.id === previousPending)
+      if (settled !== undefined && settled.status !== 'pending') heat.set(`tool:${previousPending}`, now)
+    }
+    activity = next
+    toolLayout = layoutActivity(next.tools)
+  }
+
   const onWindowChange = (id: string, source: LiveWindowLike): void => {
     knownWindows.set(id, source.entries())
     const tail = liveTailFromEntries(source.entries())
     tails.set(id, tail)
     if (tail !== null) heat.set(id, Date.now())
+    if (id === rootId) updateActivity(source)
     rebuild()
   }
 
@@ -164,6 +202,8 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
       agents,
       edges,
       layout,
+      activity,
+      toolLayout,
       heat: new Map(heat),
     }
   }

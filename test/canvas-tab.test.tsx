@@ -476,6 +476,8 @@ const swarmStateFake = {
   agents: [],
   edges: [],
   layout: { positions: new Map(), radius: 230 },
+  activity: { turnCount: 0, openTurn: false, currentTurn: null, tools: [], pendingToolId: null },
+  toolLayout: { positions: new Map() },
   heat: new Map(),
 }
 

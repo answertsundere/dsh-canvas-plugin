@@ -12,6 +12,8 @@ const swarmState = (over: Partial<AgentSwarmState> = {}): AgentSwarmState => ({
   rootId: 'root',
   rootLabel: '长任务会话',
   rootSnippet: { label: '输出', text: '正在汇总各路结果' },
+  activity: { turnCount: 0, openTurn: false, currentTurn: null, tools: [], pendingToolId: null },
+  toolLayout: { positions: new Map() },
   agents: [
     { id: 'a', label: '检索器', depth: 1, status: 'streaming', snippet: { label: '推理', text: '正在翻资料' }, tail: null },
     { id: 'b', label: '写手', depth: 1, status: 'idle', snippet: null, tail: null },
@@ -33,7 +35,7 @@ describe('AgentSwarmView', () => {
     const { container } = render(<AgentSwarmView swarm={swarmState()} onClose={() => {}} nowMs={NOW} />)
     expect(document.querySelector('[data-swarm-root]')).not.toBeNull()
     expect(container.textContent).toContain('2 个 agent')
-    expect(container.textContent).toContain('1 个活跃')
+    expect(container.textContent).toContain('近 0 轮')
     expect(container.textContent).toContain('检索器')
     expect(container.textContent).toContain('写手')
     expect(document.querySelectorAll('[data-swarm-edge]')).toHaveLength(2)
@@ -65,5 +67,45 @@ describe('AgentSwarmView', () => {
     render(<AgentSwarmView swarm={swarmState()} onClose={onClose} nowMs={NOW} />)
     fireEvent.click(document.querySelector('[data-swarm-close]') as Element)
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+})
+
+const activityState = (over: Partial<AgentSwarmState> = {}): AgentSwarmState => swarmState({
+  activity: {
+    turnCount: 15,
+    openTurn: true,
+    currentTurn: 15,
+    tools: [
+      { id: 'c1', name: 'read', status: 'ok', turn: 15 },
+      { id: 'c2', name: 'grep', status: 'pending', turn: 15 },
+    ],
+    pendingToolId: 'c2',
+  },
+  toolLayout: {
+    positions: new Map([['c1', { x: 120, y: -200 }], ['c2', { x: -120, y: -200 }]]),
+  },
+  heat: new Map([['a', NOW - 500], ['tool:c2', NOW - 300]]),
+  ...over,
+})
+
+describe('AgentSwarmView activity ring', () => {
+  it('renders tool chips with status marks and the header progress line', () => {
+    const { container } = render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={NOW} />)
+    expect(container.textContent).toContain('近 16 轮')
+    expect(container.textContent).toContain('正在 grep')
+    const pending = document.querySelector('[data-swarm-tool="c2"]')
+    expect(pending?.getAttribute('data-swarm-tool-status')).toBe('pending')
+    expect(pending?.textContent).toContain('grep')
+    const done = document.querySelector('[data-swarm-tool="c1"]')
+    expect(done?.getAttribute('data-swarm-tool-status')).toBe('ok')
+  })
+
+  it('a pending tool draws a hot edge and a crawling pulse; a settled one is dashed and cold', () => {
+    render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelectorAll('[data-swarm-pulse]')).toHaveLength(2) // agent a + pending tool
+    expect(document.querySelector('[data-swarm-pulse="tool:c2"]')).not.toBeNull()
+    expect(document.querySelector('[data-swarm-tool-edge="c2"]')?.getAttribute('stroke')).toBe('#6af')
+    const settledEdge = document.querySelector('[data-swarm-tool-edge="c1"]')
+    expect(settledEdge?.getAttribute('stroke-dasharray')).toBe('3 4')
   })
 })

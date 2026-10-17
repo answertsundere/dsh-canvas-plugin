@@ -127,3 +127,77 @@ describe('pulseProgress', () => {
     expect(pulseProgress(10_000, 10_000 + 2_000 + 1_500 + 1, 2_000)).toBeNull()
   })
 })
+
+import { activityFromEntries } from '../src/client/swarm/swarm-model.ts'
+import { layoutActivity } from '../src/client/swarm/swarm-model.ts'
+
+const call = (seq: number, callId: string, name: string) => ({
+  type: 'event' as const,
+  event: { type: 'tool/call', seq, data: { turn: 0, step: 1, callId, name, arguments: '{}' } },
+})
+const result = (seq: number, callId: string, error?: boolean) => ({
+  type: 'event' as const,
+  event: { type: 'tool/result', seq, data: { message: { toolCallId: callId }, ...(error ? { error: { message: 'x' } } : {}) } },
+})
+const turnStart = (seq: number, turn: number) => ({ type: 'event' as const, event: { type: 'turn/start', seq, data: { turn } } })
+const turnEnd = (seq: number, turn: number) => ({ type: 'event' as const, event: { type: 'turn/end', seq, data: { turn, reason: { kind: 'completed' } } } })
+
+describe('activityFromEntries', () => {
+  it('pairs tool calls with results and flags the pending one', () => {
+    const activity = activityFromEntries([
+      turnStart(1, 0),
+      call(2, 'c1', 'read'),
+      result(3, 'c1'),
+      call(4, 'c2', 'grep'),
+    ])
+    expect(activity.turnCount).toBe(0)
+    expect(activity.openTurn).toBe(true)
+    expect(activity.currentTurn).toBe(0)
+    expect(activity.tools.map(t => t.status)).toEqual(['ok', 'pending'])
+    expect(activity.pendingToolId).toBe('c2')
+  })
+
+  it('counts completed turns and reports no open turn when settled', () => {
+    const activity = activityFromEntries([
+      turnStart(1, 0), turnEnd(2, 0),
+      turnStart(3, 1), turnEnd(4, 1),
+    ])
+    expect(activity.turnCount).toBe(2)
+    expect(activity.openTurn).toBe(false)
+    expect(activity.currentTurn).toBeNull()
+    expect(activity.pendingToolId).toBeNull()
+  })
+
+  it('marks a tool whose result carried an error', () => {
+    const activity = activityFromEntries([call(1, 'c1', 'shell'), result(2, 'c1', true)])
+    expect(activity.tools[0]?.status).toBe('error')
+  })
+
+  it('keeps only the most recent tools', () => {
+    const entries = Array.from({ length: 20 }, (_, i) => call(i + 1, `c${i}`, `t${i}`))
+    const activity = activityFromEntries(entries, 12)
+    expect(activity.tools.length).toBe(12)
+    expect(activity.tools[0]?.id).toBe('c8')
+    expect(activity.tools[11]?.id).toBe('c19')
+  })
+
+  it('skips malformed rows without throwing', () => {
+    const activity = activityFromEntries([
+      { type: 'event', event: { type: 'tool/call', seq: 1 } },
+      call(2, 'c1', 'read'),
+    ])
+    expect(activity.tools.map(t => t.id)).toEqual(['c1'])
+  })
+})
+
+describe('layoutActivity', () => {
+  it('places tool nodes evenly on their own outer ring', () => {
+    const activity = activityFromEntries([call(1, 'c1', 'a'), call(2, 'c2', 'b'), call(3, 'c3', 'c')])
+    const layout = layoutActivity(activity.tools, 340)
+    expect(layout.positions.size).toBe(3)
+    for (const tool of activity.tools) {
+      const p = layout.positions.get(tool.id)!
+      expect(Math.hypot(p.x, p.y)).toBeCloseTo(340, 5)
+    }
+  })
+})

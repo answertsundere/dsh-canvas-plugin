@@ -896,6 +896,18 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 20: the activity ring — a single-agent session no longer opens an empty web (2026-10-17, user feedback)
+
+**Feedback:** "为什么这种打开都是空的" — the swarm counted only DSH subagents, but a plain long task is ONE agent working many turns and tools. The web now shows the session's own work too.
+
+**Implementation:** `activityFromEntries` (pure) folds the root's durable events — turn counting plus `tool/call`→`tool/result` pairing — into `SessionActivity` (turn count, open turn, last 12 tools with pending/ok/error). The controller filters out the inherited prefix (a fork's seed must not count its parent's turns), keeps the pending tool's edge hot while it runs, and stamps one heat on a tool that just completed so its pulse crawls home and fades. The view renders the tools on an outer ring (`layoutActivity`) with ⚙/✓/✗ chips, dashed cold edges, and the header reads `N 个 agent · 近 X 轮 · 正在 <tool>` ("近" because the window carries the recent tail, not all history — DSH's own counter says 16 轮 where the window sees 3).
+
+**Evidence (real session):** the previously-empty web of 「现在我需要制作一个项目就是」 now shows 近 3 轮 and a ring of its real tools (job_output / write / pwsh ×5 / read / update_goal, all settled ✓ — the run finished 30 minutes prior). When a tool is pending, its chip glows and a pulse crawls the spoke; a subagent, when one exists, joins its own ring as before.
+
+**Numbers:** 18 files / **250 tests** green; bundle 117.34 kB / gzip 31.09 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔
