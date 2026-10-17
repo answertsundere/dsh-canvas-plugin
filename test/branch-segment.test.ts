@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  conclusionFromEvents,
   inheritedPrefixLength,
   segmentFromEvents,
   type SessionEventLike,
@@ -222,5 +223,42 @@ describe('segmentFromEvents', () => {
     expect(segment.turns).toHaveLength(1)
     expect(segment.turns[0]?.userMessage).toBeUndefined()
     expect(segment.turns[0]?.endedAs).toBeUndefined()
+  })
+})
+
+describe('conclusionFromEvents', () => {
+  const assistant = (seq: number, text: string): SessionEventLike => ({
+    seq, type: 'assistant/message', data: { turn: 0, step: 1, message: { content: [{ type: 'text', text }] } },
+  })
+
+  it('returns the LAST assistant message, not the first', () => {
+    const conclusion = conclusionFromEvents([
+      assistant(1, '开头的话'),
+      assistant(2, '最终结论：全部完成'),
+    ])
+    expect(conclusion).toBe('最终结论：全部完成')
+  })
+
+  it('concatenates text blocks of that message and skips reasoning-only ones', () => {
+    const conclusion = conclusionFromEvents([
+      { seq: 1, type: 'assistant/message', data: { message: { content: [{ type: 'reasoning', text: '思考' }, { type: 'text', text: 'A 部分。' }, { type: 'text', text: 'B 部分。' }] } } },
+    ])
+    expect(conclusion).toBe('A 部分。B 部分。')
+  })
+
+  it('bounds long text tail-anchored with a leading ellipsis', () => {
+    const long = 'x'.repeat(900)
+    const conclusion = conclusionFromEvents([assistant(1, long)])
+    expect(conclusion?.startsWith('…')).toBe(true)
+    expect(conclusion?.length).toBe(600)
+    expect(conclusion?.endsWith('x')).toBe(true)
+  })
+
+  it('returns null without assistant messages or on malformed rows', () => {
+    expect(conclusionFromEvents([])).toBeNull()
+    expect(conclusionFromEvents([
+      { seq: 1, type: 'assistant/message', data: 'nope' },
+      { seq: 2, type: 'user/message', data: { content: [{ type: 'text', text: 'hi' }] } },
+    ])).toBeNull()
   })
 })

@@ -908,6 +908,21 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 21: conclusion at the top, right-click fork, todo checklists (2026-10-17, user feedback)
+
+**Feedback:** "右侧最好直接看到他的结论这样我就不需要点击到对话" + "在画布上面最好可以直接开分支可以是右键这种" + a reference mockup whose agent cards carry checklists, current output, and progress.
+
+**Changes:**
+- **Conclusion block**: `conclusionFromEvents` (pure, branch-segment) takes the last durable `assistant/message`'s text blocks, concatenated, tail-anchored to 600 chars (the end is the part that concludes). `CanvasDetail.conclusion` carries it on both detail paths; `BranchTimeline` renders 「最新结论」 above everything, with 还没有结论 as the honest empty state.
+- **Right-click menu**: right-clicking a node card opens a small canvas-level menu — ⑂ 从最新消息分叉 / ⌖ Agent 实况 / 打开对话 — with a backdrop for dismissal. The fork entry selects the node if needed and remembers the intent; a pending-fork effect opens the dialog at the **last non-synthetic row's** cut once the effective detail is available. Fixing the test for this surfaced a real race the same fix resolves: the selection effect's `setFork(null)` ran in the same commit and cleared the just-opened dialog — it now skips the reset while a fork intent is pending.
+- **Todo checklists** (the mockup's key visual): `todosFromEntries` (pure) folds the last `todo/write` whole-list snapshot (the same last-wins fold DSH's own projection uses); the swarm controller tracks per-node lists, and the swarm view renders them on the root and agent chips with ✓/◐/○ glyphs and a 任务 done/total line.
+
+**Evidence (real session):** right-click menu opens with all three items; 从最新消息分叉 opens the dialog at a real cut (「切点：seq 6557 · 新分支继承 6558 个事件」, cancelled without creating a branch); the detail panel's 最新结论 shows that session's actual final output, tail-anchored (`conclusion.png`, `ctx-menu.png`, `ctx-fork.png`); 0 pageerrors.
+
+**Numbers:** 18 files / **264 tests** green; bundle 126.39 kB / gzip 33.23 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔

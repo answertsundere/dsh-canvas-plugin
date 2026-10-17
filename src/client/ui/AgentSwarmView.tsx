@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties, type FC } from 'react'
 import type { AgentSwarmState } from '../controllers/agent-swarm-controller.ts'
-import { pulseProgress } from '../swarm/swarm-model.ts'
+import { pulseProgress, type SwarmTodo } from '../swarm/swarm-model.ts'
 import { theme } from '../theme.ts'
 
 export interface AgentSwarmViewProps {
@@ -32,6 +32,41 @@ const chipStyle = (streaming: boolean): CSSProperties => ({
 
 const statusColor = (status: 'streaming' | 'running' | 'idle'): string =>
   status === 'streaming' ? theme.accent : status === 'running' ? theme.warn : theme.muted
+
+const TODO_GLYPH: Record<SwarmTodo['status'], { glyph: string; color: string }> = {
+  completed: { glyph: '✓', color: '#2f9e6f' },
+  in_progress: { glyph: '◐', color: theme.warn },
+  pending: { glyph: '○', color: theme.muted },
+}
+
+/**
+ * The agent's checklist — the task list its own todo tool wrote into the
+ * session log (`todo/write`, whole-list snapshots). Completed count first, so
+ * progress is readable at a glance.
+ */
+const TodoList: FC<{ readonly items: readonly SwarmTodo[]; readonly limit: number }> = ({ items, limit }) => {
+  const done = items.filter(item => item.status === 'completed').length
+  return (
+    <div data-swarm-todos style={{ marginTop: 4 }}>
+      <div style={{ color: theme.muted, marginBottom: 2 }}>
+        任务 {done}/{items.length}
+      </div>
+      {items.slice(0, limit).map(item => (
+        <div
+          key={item.content}
+          data-swarm-todo-status={item.status}
+          style={{ display: 'flex', gap: 4, color: item.status === 'completed' ? theme.muted : theme.text }}
+        >
+          <span style={{ color: TODO_GLYPH[item.status].color, flex: '0 0 auto' }}>{TODO_GLYPH[item.status].glyph}</span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.content}</span>
+        </div>
+      ))}
+      {items.length > limit && (
+        <div style={{ color: theme.muted }}>+{items.length - limit} 项</div>
+      )}
+    </div>
+  )
+}
 
 /**
  * The 「Agent 实况」 overlay: one session's agent web.
@@ -185,6 +220,10 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                     {agent.snippet.text}
                   </div>
                 )}
+                {(() => {
+                  const agentTodos = swarm.todos.get(agent.id)
+                  return agentTodos === undefined ? null : <TodoList items={agentTodos} limit={4} />
+                })()}
               </div>
             )
           })}
@@ -247,6 +286,10 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                 {swarm.rootSnippet.text}
               </div>
             )}
+            {(() => {
+              const rootTodos = swarm.todos.get(swarm.rootId)
+              return rootTodos === undefined ? null : <TodoList items={rootTodos} limit={7} />
+            })()}
           </div>
         </div>
       </div>

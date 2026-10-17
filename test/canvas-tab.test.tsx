@@ -478,6 +478,7 @@ const swarmStateFake = {
   layout: { positions: new Map(), radius: 230 },
   activity: { turnCount: 0, openTurn: false, currentTurn: null, tools: [], pendingToolId: null },
   toolLayout: { positions: new Map() },
+  todos: new Map(),
   heat: new Map(),
 }
 
@@ -513,5 +514,46 @@ describe('active-card halo and the prominent swarm entry', () => {
   it('no inspect capability means no header action', () => {
     render(<CanvasTab canvas={model({ selectedId: 'b' })} />)
     expect(document.querySelector('[data-panel-action]')).toBeNull()
+  })
+})
+
+describe('right-click shortcuts', () => {
+  it('right-click opens the menu and 从最新消息分叉 opens the dialog at the last real row', () => {
+    const turns = [
+      { index: 0, userMessage: 'a', tools: [], firstSeq: 1, lastSeq: 4, synthetic: false },
+      { index: 1, userMessage: 'b', tools: [], firstSeq: 5, lastSeq: 9, synthetic: false },
+      { index: 2, userMessage: undefined, tools: [], firstSeq: 10, lastSeq: 10, synthetic: true },
+    ]
+    const detail: CanvasDetail = { sessionId: 'b', turns, inheritedCount: 0, cwdWarning: false }
+    // A stateful stand-in for the real model: selection sticks, as it does when
+    // the controller notifies and the tab re-renders.
+    let selected: string | undefined
+    const canvas = {
+      ...model({ onSelect: (id: string) => { selected = id }, liveDetail: () => detail }),
+      get selectedId() { return selected },
+    }
+    render(<CanvasTab canvas={canvas} />)
+    fireEvent.contextMenu(document.querySelector('[data-canvas-node="b"]') as Element)
+    expect(document.querySelector('[data-context-menu]')).not.toBeNull()
+    fireEvent.click(document.querySelector('[data-context-item="fork"]') as Element)
+    const dialog = document.querySelector('[data-fork-dialog]')
+    expect(dialog).not.toBeNull()
+    // The cut skips the trailing synthetic row: row 1's own last seq.
+    expect(document.querySelector('[data-fork-cut]')?.textContent).toContain('seq 9')
+  })
+
+  it('the menu offers 实况 and 打开对话, and a backdrop click dismisses it', () => {
+    const inspect = vi.fn(() => ({ state: () => swarmStateFake, subscribe: () => () => {}, dispose: () => {} }) as never)
+    const openInChat = vi.fn()
+    render(<CanvasTab canvas={model({ inspectSwarm: inspect, openInChat })} />)
+    fireEvent.contextMenu(document.querySelector('[data-canvas-node="a"]') as Element)
+    expect(document.querySelector('[data-context-item="inspect"]')).not.toBeNull()
+    fireEvent.click(document.querySelector('[data-context-item="open"]') as Element)
+    expect(openInChat).toHaveBeenCalledWith('a')
+    expect(document.querySelector('[data-context-menu]')).toBeNull()
+
+    fireEvent.contextMenu(document.querySelector('[data-canvas-node="a"]') as Element)
+    fireEvent.click(document.querySelector('[data-context-backdrop]') as Element)
+    expect(document.querySelector('[data-context-menu]')).toBeNull()
   })
 })

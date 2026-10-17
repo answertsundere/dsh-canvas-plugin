@@ -31,10 +31,12 @@ export interface NodeCardProps {
   onOpen?(id: string): void
   /** Opens the live agent-web view for this session. */
   onInspect?(id: string): void
+  /** Right-click: the canvas-level shortcut menu (fork / inspect / open). */
+  onContext?(event: MouseEvent<HTMLDivElement>, id: string): void
 }
 
 export const NodeCard: FC<NodeCardProps> = ({
-  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, active = false, now, onClick, onOpen, onInspect,
+  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, active = false, now, onClick, onOpen, onInspect, onContext,
 }) => (
   <div
     data-canvas-node={node.id}
@@ -44,6 +46,7 @@ export const NodeCard: FC<NodeCardProps> = ({
     data-node-active={active ? 'true' : 'false'}
     onClick={event => onClick(event, node.id)}
     onDoubleClick={event => { event.stopPropagation(); onOpen?.(node.id) }}
+    onContextMenu={onContext === undefined ? undefined : event => { event.preventDefault(); onContext(event, node.id) }}
     style={{
       position: 'absolute',
       left: position.x,

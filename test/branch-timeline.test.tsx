@@ -269,3 +269,17 @@ describe('RightPanel header action', () => {
     expect(document.querySelector('[data-panel-action]')).toBeNull()
   })
 })
+
+describe('conclusion block', () => {
+  it('shows the latest conclusion at the top of the detail panel', () => {
+    render(<BranchTimeline turns={[]} inheritedCount={0} cwdWarning={false} onFork={() => {}} conclusion="最终结论：全部完成" />)
+    const block = document.querySelector('[data-detail-conclusion]')
+    expect(block?.textContent).toContain('最新结论')
+    expect(block?.textContent).toContain('最终结论：全部完成')
+  })
+
+  it('says so when there is no conclusion yet', () => {
+    render(<BranchTimeline turns={[]} inheritedCount={0} cwdWarning={false} onFork={() => {}} conclusion={null} />)
+    expect(document.querySelector('[data-detail-conclusion]')?.textContent).toContain('还没有结论')
+  })
+})

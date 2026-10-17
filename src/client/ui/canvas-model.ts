@@ -25,6 +25,8 @@ export interface CanvasDetail {
   readonly inheritedCount: number
   /** Another running session shares this directory. */
   readonly cwdWarning: boolean
+  /** The session's latest conclusion (last assistant text, tail-bounded). */
+  readonly conclusion?: string | null
 }
 
 export interface CanvasModel {

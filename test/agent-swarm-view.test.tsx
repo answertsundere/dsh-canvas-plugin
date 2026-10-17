@@ -14,6 +14,7 @@ const swarmState = (over: Partial<AgentSwarmState> = {}): AgentSwarmState => ({
   rootSnippet: { label: '输出', text: '正在汇总各路结果' },
   activity: { turnCount: 0, openTurn: false, currentTurn: null, tools: [], pendingToolId: null },
   toolLayout: { positions: new Map() },
+  todos: new Map(),
   agents: [
     { id: 'a', label: '检索器', depth: 1, status: 'streaming', snippet: { label: '推理', text: '正在翻资料' }, tail: null },
     { id: 'b', label: '写手', depth: 1, status: 'idle', snippet: null, tail: null },
@@ -107,5 +108,32 @@ describe('AgentSwarmView activity ring', () => {
     expect(document.querySelector('[data-swarm-tool-edge="c2"]')?.getAttribute('stroke')).toBe('#6af')
     const settledEdge = document.querySelector('[data-swarm-tool-edge="c1"]')
     expect(settledEdge?.getAttribute('stroke-dasharray')).toBe('3 4')
+  })
+})
+
+describe('AgentSwarmView todo checklist', () => {
+  it('renders the root checklist with progress and glyph states', () => {
+    const state = swarmState({
+      todos: new Map([['root', [
+        { content: '拆需求', status: 'completed' },
+        { content: '写代码', status: 'in_progress' },
+        { content: '测试', status: 'pending' },
+      ]]]),
+    })
+    const { container } = render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(container.textContent).toContain('任务 1/3')
+    const done = container.querySelector('[data-swarm-todo-status="completed"]')
+    const active = container.querySelector('[data-swarm-todo-status="in_progress"]')
+    expect(done?.textContent).toContain('拆需求')
+    expect(active?.textContent).toContain('写代码')
+  })
+
+  it('renders an agent checklist on its chip too', () => {
+    const state = swarmState({
+      todos: new Map([['a', [{ content: '抓取页面', status: 'in_progress' }]]]),
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    const chip = document.querySelector('[data-swarm-agent="a"]')
+    expect(chip?.querySelector('[data-swarm-todos]')?.textContent).toContain('抓取页面')
   })
 })

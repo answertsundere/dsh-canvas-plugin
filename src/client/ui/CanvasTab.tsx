@@ -91,14 +91,50 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
     setSwarm(null)
   }
 
+  // Right-click fork: selecting a node whose detail has not loaded yet means
+  // the cut point arrives later — remember the intent, open the dialog when
+  // the effective detail shows up.
+  const [pendingForkFor, setPendingForkFor] = useState<string | null>(null)
+  useEffect(() => {
+    if (pendingForkFor === null || effectiveDetail?.sessionId !== pendingForkFor) return
+    const rows = effectiveDetail.turns
+    let lastIdx = -1
+    for (let i = rows.length - 1; i >= 0; i -= 1) {
+      const row = rows[i]
+      if (row !== undefined && !row.synthetic) { lastIdx = i; break }
+    }
+    setPendingForkFor(null)
+    if (lastIdx < 0) return
+    const atSeq = cutSeqAt(rows, lastIdx)
+    if (atSeq === undefined) return
+    setTab('detail')
+    setFork({ rowIndex: lastIdx, atSeq })
+  }, [pendingForkFor, effectiveDetail])
+
+  const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null)
+  const openContext = (event: ReactMouseEvent<HTMLDivElement>, id: string): void => {
+    setMenu({ x: event.clientX, y: event.clientY, id })
+  }
+  const menuFork = (): void => {
+    const id = menu?.id
+    setMenu(null)
+    if (id === undefined) return
+    if (canvas?.selectedId !== id) canvas?.onSelect(id)
+    setPendingForkFor(id)
+  }
+
   // A node's turns come from its live window while one is open, and from a
   // one-shot read otherwise — including when a running session stops and its
   // window closes under the selection.
   const hasLiveDetail = liveDetail !== null
   useEffect(() => {
     setTab('detail')
-    setFork(null)
-    setForkError(undefined)
+    // A pending right-click fork opens the dialog for this very selection in
+    // the same commit; resetting here would clear it before it is seen.
+    if (pendingForkFor === null) {
+      setFork(null)
+      setForkError(undefined)
+    }
     if (canvas?.detail === undefined || selectedId === undefined || hasLiveDetail) {
       setDetail(null)
       return
@@ -198,6 +234,47 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
       <style>{CANVAS_CSS}</style>
       {swarm !== null && (
         <AgentSwarmView swarm={swarm.state()} onClose={closeSwarm} />
+      )}
+      {menu !== null && (
+        <>
+          <div
+            data-context-backdrop
+            onClick={() => setMenu(null)}
+            onContextMenu={event => { event.preventDefault(); setMenu(null) }}
+            style={{ position: 'fixed', inset: 0, zIndex: 20 }}
+          />
+          <div
+            data-context-menu
+            style={{
+              position: 'fixed', left: menu.x, top: menu.y, zIndex: 21,
+              minWidth: 180, padding: 4,
+              background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 8,
+              boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+              font: '12px system-ui, sans-serif', color: theme.text,
+            }}
+          >
+            {[
+              { key: 'fork', label: '⑂ 从最新消息分叉', run: menuFork },
+              ...(canvas.inspectSwarm !== undefined
+                ? [{ key: 'inspect', label: '⌖ Agent 实况', run: () => { setMenu(null); openSwarm(menu.id) } }]
+                : []),
+              ...(canvas.openInChat !== undefined
+                ? [{ key: 'open', label: '打开对话', run: () => { setMenu(null); canvas.openInChat?.(menu.id) } }]
+                : []),
+            ].map(item => (
+              <div
+                key={item.key}
+                data-context-item={item.key}
+                onClick={item.run}
+                style={{ padding: '6px 10px', borderRadius: 6, cursor: 'pointer' }}
+                onMouseEnter={event => { event.currentTarget.style.background = theme.cardActive }}
+                onMouseLeave={event => { event.currentTarget.style.background = 'transparent' }}
+              >
+                {item.label}
+              </div>
+            ))}
+          </div>
+        </>
       )}
       <div
         data-canvas-toolbar
@@ -301,6 +378,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   onClick={handleNodeClick}
                   onOpen={id => canvas.openInChat?.(id)}
                   onInspect={canvas.inspectSwarm === undefined ? undefined : openSwarm}
+                  onContext={openContext}
                 />
               )
             })}
@@ -326,6 +404,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                 turns={effectiveDetail?.turns ?? []}
                 inheritedCount={effectiveDetail?.inheritedCount ?? 0}
                 cwdWarning={effectiveDetail?.cwdWarning ?? false}
+                conclusion={effectiveDetail?.conclusion ?? null}
                 live={tail}
                 onFork={openFork}
               />

@@ -4,9 +4,11 @@ import {
   layoutActivity,
   layoutSwarm,
   swarmEdges,
+  todosFromEntries,
   type ActivityTool,
   type AgentNode,
   type SessionActivity,
+  type SwarmTodo,
 } from '../swarm/swarm-model.ts'
 import { inheritedPrefixLength, type SessionEventLike } from '../compare/branch-segment.ts'
 import { liveTailFromEntries, tailSnippet, type LiveTail, type TailSnippet } from '../live/live-tail.ts'
@@ -43,6 +45,8 @@ export interface AgentSwarmState {
   /** The session's own work (turns and tools), for the activity ring. */
   readonly activity: SessionActivity
   readonly toolLayout: ReturnType<typeof layoutActivity>
+  /** Each node's current todo list (root and agents), when it has written one. */
+  readonly todos: ReadonlyMap<string, readonly SwarmTodo[]>
   /**
    * Last activity per node id (agents and `tool:<callId>` entries — each
    * incoming edge's heat). The view feeds these into `pulseProgress` at each
@@ -77,6 +81,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
   const listeners = new Set<() => void>()
   const windows = new Map<string, Held>()
   const tails = new Map<string, LiveTail | null>()
+  const todos = new Map<string, readonly SwarmTodo[]>()
   const heat = new Map<string, number>()
   const failed = new Set<string>()
   /** Catalog facts merged across refreshes; a window that went away must not retract an agent. */
@@ -138,6 +143,9 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
     knownWindows.set(id, source.entries())
     const tail = liveTailFromEntries(source.entries())
     tails.set(id, tail)
+    const nodeTodos = todosFromEntries(source.entries())
+    if (nodeTodos === null) todos.delete(id)
+    else todos.set(id, nodeTodos)
     if (tail !== null) heat.set(id, Date.now())
     if (id === rootId) updateActivity(source)
     rebuild()
@@ -204,6 +212,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
       layout,
       activity,
       toolLayout,
+      todos: new Map(todos),
       heat: new Map(heat),
     }
   }
@@ -221,6 +230,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
       disposed = true
       for (const id of [...windows.keys()]) closeWindow(id)
       tails.clear()
+      todos.clear()
       heat.clear()
     },
   }

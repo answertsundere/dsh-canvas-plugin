@@ -4,7 +4,7 @@ import { buildLineageGraph } from '../graph/graph-model.ts'
 import { toSummaries } from '../adapters/session-adapter.ts'
 import { selectWorkspaceSummaries, toWorkspaceItems } from '../adapters/workspace-adapter.ts'
 import { deriveStatus, type RuntimeHint } from '../adapters/runtime-status-adapter.ts'
-import { inheritedPrefixLength, segmentFromEvents, type SessionEventLike } from '../compare/branch-segment.ts'
+import { inheritedPrefixLength, conclusionFromEvents, segmentFromEvents, type SessionEventLike } from '../compare/branch-segment.ts'
 import { compareBranches } from '../compare/diff.ts'
 import { parallelWriteIds } from '../graph/parallel-write.ts'
 import { liveTailFromEntries, type LiveEntryLike, type LiveTail } from '../live/live-tail.ts'
@@ -126,6 +126,7 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
       turns: segmentFromEvents(id, inheritedCount, events).turns,
       inheritedCount,
       cwdWarning: parallelWriteIds(graph).has(id),
+      conclusion: conclusionFromEvents(events),
     }
   }
 
@@ -295,6 +296,7 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
         turns: segmentFromEvents(id, inheritedCount, events).turns,
         inheritedCount,
         cwdWarning: parallelWriteIds(graph).has(id),
+        conclusion: conclusionFromEvents(events),
       }
     } catch {
       return null

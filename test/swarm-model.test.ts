@@ -201,3 +201,27 @@ describe('layoutActivity', () => {
     }
   })
 })
+
+import { todosFromEntries } from '../src/client/swarm/swarm-model.ts'
+
+describe('todosFromEntries', () => {
+  it('returns the last todo/write snapshot, last-write-wins', () => {
+    const todos = todosFromEntries([
+      { type: 'event', event: { type: 'todo/write', seq: 1, data: { todos: [{ content: '旧的', status: 'pending' }] } } },
+      { type: 'event', event: { type: 'todo/write', seq: 2, data: { todos: [
+        { content: '拆需求', status: 'completed' },
+        { content: '写代码', status: 'in_progress' },
+        { content: '测试', status: 'pending' },
+      ] } } },
+    ])
+    expect(todos?.map(t => `${t.content}:${t.status}`)).toEqual(['拆需求:completed', '写代码:in_progress', '测试:pending'])
+  })
+
+  it('returns null before the first write and on malformed rows', () => {
+    expect(todosFromEntries([])).toBeNull()
+    expect(todosFromEntries([
+      { type: 'event', event: { type: 'todo/write', seq: 1, data: 'nope' } },
+      { type: 'event', event: { type: 'user/message', seq: 2, data: {} } },
+    ])).toBeNull()
+  })
+})

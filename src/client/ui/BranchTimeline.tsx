@@ -16,6 +16,8 @@ export interface BranchTimelineProps {
    * disappears on its own when the durable message settles it.
    */
   readonly live?: LiveTail | null
+  /** The session's latest conclusion, so the answer is visible without opening 对话. */
+  readonly conclusion?: string | null
 }
 
 /**
@@ -33,8 +35,17 @@ export function cutSeqAt(turns: readonly BranchTurn[], rowIndex: number): number
   return turns[rowIndex]?.lastSeq
 }
 
-export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount, onFork, cwdWarning, live = null }) => (
+export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount, onFork, cwdWarning, live = null, conclusion }) => (
   <div data-branch-timeline style={{ font: '12px/1.5 system-ui, sans-serif', color: theme.text }}>
+    <div
+      data-detail-conclusion
+      style={{ padding: '8px 10px', borderBottom: `1px solid ${theme.border}`, background: theme.card }}
+    >
+      <div style={{ color: theme.muted, marginBottom: 4 }}>最新结论</div>
+      {conclusion
+        ? <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{conclusion}</div>
+        : <div style={{ color: theme.muted }}>还没有结论</div>}
+    </div>
     <div data-timeline-inherited style={{ color: theme.muted, padding: '6px 10px', borderBottom: `1px solid ${theme.border}` }}>
       继承 {inheritedCount} 个事件（不计入对比）
     </div>

@@ -212,3 +212,31 @@ function bound(text: string): string | undefined {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
+
+/** The detail panel bounds the conclusion so it informs without replacing the read. */
+export const CONCLUSION_BOUND = 600
+
+/**
+ * The session's latest conclusion: the last durable `assistant/message`'s text
+ * blocks, concatenated, tail-anchored to `bound` characters — when a conclusion
+ * is long, its end is the part that concludes. Null when the session has said
+ * nothing yet.
+ */
+export function conclusionFromEvents(events: readonly SessionEventLike[], bound = CONCLUSION_BOUND): string | null {
+  let conclusion: string | null = null
+  for (const event of events) {
+    if (event.type !== 'assistant/message') continue
+    const data = isRecord(event.data) ? event.data : undefined
+    const message = isRecord(data?.['message']) ? data['message'] : undefined
+    const content = Array.isArray(message?.['content']) ? message['content'] : undefined
+    if (content === undefined) continue
+    const text = content
+      .filter((block): block is Record<string, unknown> => isRecord(block) && block['type'] === 'text')
+      .map(block => (typeof block['text'] === 'string' ? block['text'] : ''))
+      .join('')
+      .trim()
+    if (text !== '') conclusion = text
+  }
+  if (conclusion === null || conclusion.length <= bound) return conclusion
+  return `…${conclusion.slice(-(bound - 1))}`
+}

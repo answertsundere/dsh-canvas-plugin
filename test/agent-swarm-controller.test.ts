@@ -199,3 +199,34 @@ describe('root activity in the swarm', () => {
     controller.dispose()
   })
 })
+
+describe('todos in the swarm', () => {
+  it('folds the latest todo/write per node and clears it when absent', async () => {
+    const fake = makeDeps({ windows: { root: [
+      { type: 'event', event: { type: 'todo/write', seq: 1, data: { todos: [
+        { content: '拆需求', status: 'completed' },
+        { content: '写代码', status: 'in_progress' },
+      ] } } },
+    ] } })
+    const controller = createAgentSwarmController(fake.deps, 'root')
+    await flush()
+    expect(controller.state().todos.get('root')?.map(t => t.content)).toEqual(['拆需求', '写代码'])
+    controller.dispose()
+  })
+
+  it('a later snapshot replaces the list whole', async () => {
+    const fake = makeDeps({ windows: { root: [
+      { type: 'event', event: { type: 'todo/write', seq: 1, data: { todos: [{ content: '旧', status: 'pending' }] } } },
+    ] } })
+    const controller = createAgentSwarmController(fake.deps, 'root')
+    await flush()
+    fake.handles.get('root')!.setEntries([
+      { type: 'event', event: { type: 'todo/write', seq: 1, data: { todos: [{ content: '旧', status: 'pending' }] } } },
+      { type: 'event', event: { type: 'todo/write', seq: 2, data: { todos: [{ content: '新', status: 'in_progress' }] } } },
+    ] as never)
+    fake.handles.get('root')!.emit()
+    await flush()
+    expect(controller.state().todos.get('root')?.map(t => t.content)).toEqual(['新'])
+    controller.dispose()
+  })
+})

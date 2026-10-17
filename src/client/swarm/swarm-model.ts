@@ -285,3 +285,38 @@ export function layoutActivity(
   })
   return { positions }
 }
+
+/** One line of an agent's todo list (`todo/write` whole-list snapshots). */
+export interface SwarmTodo {
+  readonly content: string
+  readonly status: 'pending' | 'in_progress' | 'completed'
+}
+
+/**
+ * The agent's current todo list: the last `todo/write` snapshot in its own
+ * window (whole-list, last-write-wins — the same fold DSH's projection uses).
+ * Null before the first write; malformed rows are skipped.
+ */
+export function todosFromEntries(entries: readonly LiveEntryLike[]): SwarmTodo[] | null {
+  let todos: SwarmTodo[] | null = null
+  for (const entry of entries) {
+    const row = asRecord(entry)
+    if (row === null || row['type'] !== 'event') continue
+    const event = asRecord(row['event'])
+    if (event === null || event['type'] !== 'todo/write') continue
+    const data = asRecord(event['data'])
+    const list = data === null ? undefined : data['todos']
+    if (!Array.isArray(list)) continue
+    const folded: SwarmTodo[] = []
+    for (const item of list) {
+      const record = asRecord(item)
+      const content = record === null ? undefined : record['content']
+      const status = record?.['status']
+      if (typeof content !== 'string' || content === '') continue
+      if (status !== 'pending' && status !== 'in_progress' && status !== 'completed') continue
+      folded.push({ content, status })
+    }
+    if (folded.length > 0) todos = folded
+  }
+  return todos
+}
