@@ -341,23 +341,29 @@ export function sweepProgress(
   return t / travel
 }
 
-/** Visual identity of one tool family: a text glyph and its color. */
+/** The robot body a node wears; each variant is its own drawing. */
+export type RobotVariant =
+  | 'generic' | 'shell' | 'job' | 'read' | 'write' | 'search' | 'todo' | 'fetch'
+  | 'agent' | 'root'
+
+/** Visual identity of one tool family: a text glyph, its color, and its robot. */
 export interface ToolVisual {
   readonly glyph: string
   readonly color: string
+  readonly variant: RobotVariant
 }
 
 const TOOL_VISUALS: readonly { readonly pattern: RegExp; readonly visual: ToolVisual }[] = [
-  { pattern: /^(pwsh|powershell|shell|bash|cmd|terminal|subprocess)/i, visual: { glyph: '▸', color: '#2f9e6f' } },
-  { pattern: /^job_/i, visual: { glyph: '▤', color: '#2f9e6f' } },
-  { pattern: /^(read|cat|view|open|ls|list)/i, visual: { glyph: '◧', color: '#4aa3df' } },
-  { pattern: /^(write|edit|create|patch|apply)/i, visual: { glyph: '✎', color: '#8a7dff' } },
-  { pattern: /^(grep|search|find|query)/i, visual: { glyph: '⌕', color: '#d98a2b' } },
-  { pattern: /^(todo|task|plan)/i, visual: { glyph: '☑', color: '#2f9e6f' } },
-  { pattern: /^(fetch|web|http|curl)/i, visual: { glyph: '☍', color: '#4aa3df' } },
+  { pattern: /^(pwsh|powershell|shell|bash|cmd|terminal|subprocess)/i, visual: { glyph: '▸', color: '#2f9e6f', variant: 'shell' } },
+  { pattern: /^job_/i, visual: { glyph: '▤', color: '#2f9e6f', variant: 'job' } },
+  { pattern: /^(read|cat|view|open|ls|list)/i, visual: { glyph: '◧', color: '#4aa3df', variant: 'read' } },
+  { pattern: /^(write|edit|create|patch|apply)/i, visual: { glyph: '✎', color: '#8a7dff', variant: 'write' } },
+  { pattern: /^(grep|search|find|query)/i, visual: { glyph: '⌕', color: '#d98a2b', variant: 'search' } },
+  { pattern: /^(todo|task|plan)/i, visual: { glyph: '☑', color: '#2f9e6f', variant: 'todo' } },
+  { pattern: /^(fetch|web|http|curl)/i, visual: { glyph: '☍', color: '#4aa3df', variant: 'fetch' } },
 ]
 
-const GENERIC_TOOL: ToolVisual = { glyph: '⚙', color: '#9aa4b2' }
+const GENERIC_TOOL: ToolVisual = { glyph: '⚙', color: '#9aa4b2', variant: 'generic' }
 
 /** The tool's family glyph and color — one home for the mapping the view draws. */
 export function toolGlyph(name: string): ToolVisual {

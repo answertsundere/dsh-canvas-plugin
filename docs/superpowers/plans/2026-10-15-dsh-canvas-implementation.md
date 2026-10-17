@@ -960,6 +960,18 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 25: every robot gets its own body (2026-10-17, user feedback)
+
+**Feedback:** "每一个机器人的形象也需要不同做独立的优化".
+
+**Change:** `RobotAvatar` now draws ten distinct bodies instead of one tinted template: **shell** (square head with a terminal prompt screen and a stub antenna), **job** (twin antennas and a gauge dial on the chest), **read** (domed head with one large scanner lens), **write** (pen-nib antenna, a pencil in the right hand), **search** (magnifier replacing one eye, radar-arc antenna), **todo** (checklist panel on the chest), **fetch** (dish antenna, globe chest), **agent** (headset with a mic boom), **root** (three-LED crown and a collar), plus the generic chassis. `toolGlyph` (pure) now also returns the variant, so the mapping is data and each family's robot is decided in one place. The shared parts (arms, visor head, body) keep the state animations working across all ten designs.
+
+**Evidence:** live on the real session — terminal bots with prompt screens, twin-antenna gauge bots, one-eyed scanners, pen-nib scribes, the crowned root, and a red shaking failure, all on one web; 0 pageerrors (`sweep-live.png`).
+
+**Numbers:** 18 files / **278 tests** green; bundle 155.84 kB / gzip 38.72 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔

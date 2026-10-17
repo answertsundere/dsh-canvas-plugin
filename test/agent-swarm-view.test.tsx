@@ -187,3 +187,40 @@ describe('robot avatars', () => {
     expect(document.querySelector('[data-swarm-tool-edge="c1"]')?.getAttribute('class')).toBeNull()
   })
 })
+
+describe('robot variant identity', () => {
+  it('each tool family wears its own robot body', () => {
+    const state = activityState({
+      activity: {
+        turnCount: 1, openTurn: false, currentTurn: null,
+        tools: [
+          { id: 't1', name: 'pwsh', status: 'ok', turn: 1 },
+          { id: 't2', name: 'job_output', status: 'ok', turn: 1 },
+          { id: 't3', name: 'read', status: 'ok', turn: 1 },
+          { id: 't4', name: 'edit', status: 'ok', turn: 1 },
+          { id: 't5', name: 'grep', status: 'ok', turn: 1 },
+          { id: 't6', name: 'mystery', status: 'ok', turn: 1 },
+        ],
+        pendingToolId: null,
+      },
+      toolLayout: { positions: new Map([['t1', { x: 0, y: -300 }], ['t2', { x: 100, y: -280 }], ['t3', { x: 200, y: -200 }], ['t4', { x: 280, y: -100 }], ['t5', { x: 300, y: 0 }], ['t6', { x: 280, y: 100 }]]) },
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    const variantOf = (id: string): string | null | undefined =>
+      document.querySelector(`[data-swarm-tool="${id}"] [data-robot]`)?.getAttribute('data-robot-variant')
+    expect(variantOf('t1')).toBe('shell')
+    expect(variantOf('t2')).toBe('job')
+    expect(variantOf('t3')).toBe('read')
+    expect(variantOf('t4')).toBe('write')
+    expect(variantOf('t5')).toBe('search')
+    expect(variantOf('t6')).toBe('generic')
+  })
+
+  it('variant bodies differ: the terminal bot has a prompt screen, the scribe a pencil', () => {
+    render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={NOW} />)
+    // The root is the crowned session robot.
+    expect(document.querySelector('[data-swarm-root-agent="true"] [data-robot]')?.getAttribute('data-robot-variant')).toBe('root')
+    // Agents wear headsets.
+    expect(document.querySelector('[data-swarm-agent="a"] [data-robot]')?.getAttribute('data-robot-variant')).toBe('agent')
+  })
+})

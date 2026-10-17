@@ -361,6 +361,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                     size={26}
                     color={statusColor(agent.status)}
                     state={AGENT_ROBOT[agent.status]}
+                    variant="agent"
                     statusAttr={{ name: 'data-swarm-status', value: agent.status }}
                   />
                   <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -418,6 +419,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                   size={20}
                   color={failed ? '#e0554d' : visual.color}
                   state={TOOL_ROBOT[tool.status]}
+                  variant={visual.variant}
                 />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.name}</span>
                 <span style={{ flex: '0 0 auto', color: failed ? '#e0554d' : theme.muted }}>
@@ -447,7 +449,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <RobotAvatar size={38} color={theme.text} state={rootHot ? 'working' : 'idle'} />
+              <RobotAvatar size={38} color={theme.text} state={rootHot ? 'working' : 'idle'} variant="root" />
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {swarm.rootLabel}

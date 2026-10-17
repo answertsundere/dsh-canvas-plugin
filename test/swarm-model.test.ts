@@ -267,6 +267,17 @@ describe('toolGlyph', () => {
   it('falls back to a generic glyph for unknown tools', () => {
     expect(toolGlyph('mystery_tool').glyph).toBe('⚙')
   })
+
+  it('each family carries its own robot variant', () => {
+    expect(toolGlyph('pwsh').variant).toBe('shell')
+    expect(toolGlyph('job_output').variant).toBe('job')
+    expect(toolGlyph('read').variant).toBe('read')
+    expect(toolGlyph('edit').variant).toBe('write')
+    expect(toolGlyph('grep').variant).toBe('search')
+    expect(toolGlyph('todo').variant).toBe('todo')
+    expect(toolGlyph('fetch').variant).toBe('fetch')
+    expect(toolGlyph('mystery').variant).toBe('generic')
+  })
 })
 
 describe('turnGroups', () => {
