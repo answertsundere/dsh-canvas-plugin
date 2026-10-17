@@ -205,6 +205,13 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
   const toolPositionOf = (id: string): { x: number; y: number } => swarm.toolLayout.positions.get(id) ?? { x: 0, y: 0 }
   const agents = swarm.agents
   const tools = swarm.activity.tools
+  // Teammates currently owning an in-progress shared task glow — the board
+  // and the web tell the same story.
+  const busyOwners = new Set(
+    (swarm.team?.tasks ?? [])
+      .filter(task => task.status === 'in_progress' && task.ownerName !== undefined)
+      .map(task => task.ownerName as string),
+  )
   const pendingTool = tools.find(tool => tool.id === swarm.activity.pendingToolId) ?? null
   const groups = turnGroups(tools)
   const rootTodos = swarm.todos.get(swarm.rootId)
@@ -452,6 +459,9 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                   top: VIEW.height / 2 + p.y,
                   outline: `1px dashed ${statusColor(agent.status, accent)}`,
                   outlineOffset: 4,
+                  ...(busyOwners.has(agent.label)
+                    ? { border: `2px solid ${theme.warn}`, boxShadow: `0 0 10px ${theme.warn}66` }
+                    : {}),
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -470,6 +480,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                     <div style={{ color: theme.muted, fontSize: 10 }}>
                       {agent.role === 'teammate' ? '团队成员' : agent.role === 'lead' ? '团队主管' : '子代理'}
                       {agent.status === 'failed' ? ' · 失败' : ''}
+                      {busyOwners.has(agent.label) ? ' · 执行任务中' : ''}
                     </div>
                   </div>
                 </div>
@@ -527,7 +538,12 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                   variant={visual.variant}
                   species="device"
                 />
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.name}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {tool.name}
+                  {tool.preview !== undefined && (
+                    <span style={{ color: theme.muted }}> {tool.preview}</span>
+                  )}
+                </span>
                 <span style={{ flex: '0 0 auto', color: failed ? '#e0554d' : theme.muted }}>
                   {pending ? '…' : failed ? '✗' : '✓'}
                 </span>

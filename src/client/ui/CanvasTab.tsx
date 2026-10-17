@@ -64,6 +64,15 @@ const CANVAS_CSS = `
    and the thread itself breathes its width. */
 @keyframes dshHotWidth { 0%, 100% { stroke-width: 1.8; } 50% { stroke-width: 3; } }
 .dsh-swarm-hot { stroke-dasharray: 6 6; animation: dshDashFlow 0.8s linear infinite, dshHotWidth 1.2s ease-in-out infinite; }
+
+/* Idle robots fidget with their own tool: the investigator swings the
+   magnifier, the scribe taps the pencil, the scanner lens glints. */
+@keyframes dshIdleSwing { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes dshIdleTap { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes dshIdleGlint { 0%, 70%, 100% { opacity: 0.8; } 80% { opacity: 0.1; } }
+.dsh-robot-v-search.dsh-robot-idle [data-robot-part='magnifier'] { transform-origin: 24px 20px; animation: dshIdleSwing 3.6s ease-in-out infinite; }
+.dsh-robot-v-write.dsh-robot-idle [data-robot-part='pencil'] { animation: dshIdleTap 2.8s ease-in-out infinite; }
+.dsh-robot-v-read.dsh-robot-idle .dsh-robot-eye { animation: dshIdleGlint 4.2s ease-in-out infinite; }
 `
 
 export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
@@ -134,6 +143,28 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
     setTab('detail')
     setFork({ rowIndex: lastIdx, atSeq })
   }, [pendingForkFor, effectiveDetail])
+
+  // Fit the view once, when the first nodes arrive — an empty opening canvas
+  // that grows into a lopsided corner is exactly what 适配视图 exists for.
+  const autoFitted = useRef(false)
+  useEffect(() => {
+    if (autoFitted.current || canvas === undefined) return
+    if (canvas.graph.nodes.size === 0) return
+    autoFitted.current = true
+    const layout = layoutLayered(canvas.graph, { nodeWidth: NODE_WIDTH, nodeHeight: NODE_HEIGHT })
+    if (layout.width === 0 || layout.height === 0) return
+    const fitScale = Math.min(
+      (FIT_VIEWPORT.width - 40) / layout.width,
+      (FIT_VIEWPORT.height - 40) / layout.height,
+      1,
+    )
+    const clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fitScale === 0 ? 1 : fitScale))
+    canvas.onViewChange({
+      x: ((FIT_VIEWPORT.width - layout.width * clamped) / 2),
+      y: ((FIT_VIEWPORT.height - layout.height * clamped) / 2),
+      scale: clamped,
+    })
+  }, [canvas, canvas?.graph.nodes.size])
 
   const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null)
   const openContext = (event: ReactMouseEvent<HTMLDivElement>, id: string): void => {
@@ -386,8 +417,9 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   key={`${edge.from}->${edge.to}`}
                   d={edge.d}
                   fill="none"
-                  stroke={edge.active ? theme.accent : theme.border}
-                  strokeWidth={1.5}
+                  stroke={edge.active ? theme.accent : edge.busy ? theme.warn : theme.border}
+                  strokeWidth={edge.active ? 1.8 : edge.busy ? 1.6 : 1.5}
+                  opacity={edge.active ? 1 : edge.busy ? 0.8 : 0.7}
                 />
               ))}
             </svg>
@@ -476,7 +508,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
 }
 
 function edgePaths(canvas: CanvasModel, positions: ReadonlyMap<SessionId, LayoutPoint>) {
-  const edges: { from: SessionId; to: SessionId; d: string; active: boolean }[] = []
+  const edges: { from: SessionId; to: SessionId; d: string; active: boolean; busy: boolean }[] = []
   for (const node of canvas.graph.nodes.values()) {
     if (node.parentId === null) continue
     const from = positions.get(node.parentId)
@@ -486,11 +518,14 @@ function edgePaths(canvas: CanvasModel, positions: ReadonlyMap<SessionId, Layout
     const y1 = from.y + NODE_HEIGHT / 2
     const x2 = to.x
     const y2 = to.y + NODE_HEIGHT / 2
+    const status = canvas.statusOf(node.id).kind
     edges.push({
       from: node.parentId,
       to: node.id,
       d: `M ${x1} ${y1} C ${x1 + 40} ${y1}, ${x2 - 40} ${y2}, ${x2} ${y2}`,
       active: canvas.selectedId === node.id || canvas.compareIds.includes(node.id),
+      // A thread feeding a working session is never border-dark.
+      busy: status === 'thinking' || status === 'tool',
     })
   }
   return edges

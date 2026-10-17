@@ -183,6 +183,8 @@ export interface ActivityTool {
   readonly name: string
   readonly status: 'pending' | 'ok' | 'error'
   readonly turn: number
+  /** One-line preview of the call arguments, bounded for the chip. */
+  readonly preview?: string
 }
 
 /** What the inspected session itself is working through, from its own log. */
@@ -235,11 +237,14 @@ export function activityFromEntries(entries: readonly LiveEntryLike[], cap = ACT
       case 'tool/call': {
         const callId = data?.['callId']
         if (typeof callId !== 'string' || callId === '') break
+        const rawArguments = typeof data?.['arguments'] === 'string' ? data['arguments'] : ''
+        const collapsed = rawArguments.replace(/\s+/g, ' ').trim()
         tools.push({
           id: callId,
           name: typeof data?.['name'] === 'string' ? data['name'] : '…',
           status: 'pending',
           turn: typeof data?.['turn'] === 'number' ? data['turn'] : 0,
+          ...(collapsed === '' ? {} : { preview: collapsed.length > 48 ? `${collapsed.slice(0, 48)}…` : collapsed }),
         })
         if (tools.length > cap) tools.shift()
         break

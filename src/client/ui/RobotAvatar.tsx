@@ -251,7 +251,7 @@ export const RobotAvatar: FC<RobotAvatarProps> = ({ size = 26, color, state, var
     data-robot-state={state}
     data-robot-variant={variant}
     data-robot-species={species}
-    className={`dsh-robot dsh-robot-${state}${species === 'device' ? ' dsh-robot-device' : ''}`}
+    className={`dsh-robot dsh-robot-${state} dsh-robot-v-${variant}${species === 'device' ? ' dsh-robot-device' : ''}`}
     style={{ display: 'inline-block', flex: '0 0 auto', width: size, height: size * 1.1 }}
     {...(statusAttr === undefined ? {} : { [statusAttr.name]: statusAttr.value })}
   >

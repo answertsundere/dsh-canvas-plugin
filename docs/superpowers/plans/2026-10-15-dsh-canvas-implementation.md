@@ -1002,6 +1002,20 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 28: deep-optimization rounds 1–3 (2026-10-17, autonomous pass; continuing)
+
+**Method:** CDP screenshots (`Page.captureScreenshot` — bypasses the font-load hang that breaks `page.screenshot`) over the real app, plus DOM probes for overlap/positions/zoom math. Found and fixed:
+
+- **Round 1 (critical + interaction):** team members rendered **stacked behind the root card** — the layout only placed catalog children, so projection members had no positions (all at 0,0). Members now merge into the node set and take ring positions with root spokes (live: 5 chips, 0 overlaps). A team member's card now shows its **team name + 主管/成员 badge** instead of the prompt that spawned it (title override folded through `teamMembersFromList`). Main-canvas **drag threshold**: panning from a card no longer selects it on mouse-up (>4px swallows the click). Swarm **wheel zoom anchors at the cursor** (`anchoredPan`, pure). Hot threads breathe their width while the dashes flow.
+- **Round 2 (visual):** the main canvas **auto-fits once when the first nodes arrive** (the lopsided-corner opening is gone); a thread feeding a working session is tinted amber instead of border-dark; idle robots fidget with their own tool — the investigator swings the magnifier, the scribe taps the pencil, the scanner lens glints.
+- **Round 3 (features):** tool cards show a bounded one-line **argument preview** (`npm test --watch`, whitespace-collapsed, 48 chars + …); a teammate owning an **in-progress shared task** gets an amber border + glow and an 执行任务中 role line — the task board and the web tell the same story.
+
+**Evidence:** live on the team session — 4 teammate robots with auras at distinct ring positions, anchored zoom (pan moved with the cursor), 0 overlaps, 0 pageerrors (`r0-swarm-zoomed.png`, `r0-canvas.png`).
+
+**Numbers:** 18 files / **304 tests** green; bundle 172.47 kB / gzip 42.84 kB; both profiles reinstalled, `m0-check` 11/11 ×2. Continuing rounds next.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔

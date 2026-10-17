@@ -284,3 +284,33 @@ describe('species split, scaling, and team tasks', () => {
     expect(plane.style.transform).toContain('scale')
   })
 })
+
+describe('tool previews and busy owners', () => {
+  it('the tool card shows the argument preview', () => {
+    const state = activityState({
+      activity: {
+        turnCount: 0, openTurn: true, currentTurn: 0,
+        tools: [{ id: 'c1', name: 'pwsh', status: 'pending', turn: 0, preview: 'npm test --watch' }],
+        pendingToolId: 'c1',
+      },
+      toolLayout: { maxRadius: 400, positions: new Map([['c1', { x: 0, y: -300 }]]) },
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-tool="c1"]')?.textContent).toContain('npm test --watch')
+  })
+
+  it('a teammate owning an in-progress task glows and says so', () => {
+    const state = activityState({
+      team: {
+        members: [{ id: 'root', name: 'lead', role: 'lead', phase: 'active' }],
+        tasks: [{ id: 't1', subject: '写接口', status: 'in_progress', ownerName: '检索器' }],
+      },
+    })
+    const { container } = render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    const chip = container.querySelector('[data-swarm-agent="a"]') as HTMLElement
+    expect(chip.style.border).toContain(themeWarn())
+    expect(chip.textContent).toContain('执行任务中')
+  })
+
+  function themeWarn(): string { return '#e0a23c' }
+})

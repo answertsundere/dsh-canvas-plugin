@@ -390,3 +390,20 @@ describe('anchoredPan', () => {
     expect(next.y).toBeCloseTo(cursor.y - center.y - contentY * 2, 5)
   })
 })
+
+describe('activityFromEntries previews', () => {
+  it('captures a bounded one-line preview of the call arguments', () => {
+    const activity = activityFromEntries([
+      { type: 'event', event: { type: 'tool/call', seq: 1, data: { turn: 0, step: 1, callId: 'c1', name: 'pwsh', arguments: 'npm  test\n--watch' } } },
+    ])
+    expect(activity.tools[0]?.preview).toBe('npm test --watch')
+  })
+
+  it('bounds long previews with an ellipsis', () => {
+    const activity = activityFromEntries([
+      { type: 'event', event: { type: 'tool/call', seq: 1, data: { turn: 0, step: 1, callId: 'c1', name: 'write', arguments: 'x'.repeat(80) } } },
+    ])
+    expect(activity.tools[0]?.preview?.length).toBe(49)
+    expect(activity.tools[0]?.preview?.endsWith('…')).toBe(true)
+  })
+})
