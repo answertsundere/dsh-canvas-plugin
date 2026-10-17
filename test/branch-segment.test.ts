@@ -150,6 +150,29 @@ describe('segmentFromEvents', () => {
     expect(segment.turns[0]?.endedAs).toBe('completed')
   })
 
+  it('records the seq range each turn owns, so the UI can name a real cut point', () => {
+    const segment = segmentFromEvents('s', 10, [
+      ev(10, 'turn/start', { turn: 1 }),
+      ev(11, 'user/message', userMessage('first')),
+      ev(14, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      ev(20, 'turn/start', { turn: 2 }),
+      ev(23, 'user/message', userMessage('second')),
+      ev(24, 'turn/end', { turn: 2, reason: { kind: 'completed' } }),
+    ])
+    expect(segment.turns[0]).toMatchObject({ firstSeq: 10, lastSeq: 14 })
+    expect(segment.turns[1]).toMatchObject({ firstSeq: 20, lastSeq: 24 })
+  })
+
+  it('starts a turn at its own turn/start, not at the previous turn end', () => {
+    const segment = segmentFromEvents('s', 0, [
+      ev(0, 'turn/start', { turn: 1 }),
+      ev(1, 'turn/end', { turn: 1, reason: { kind: 'completed' } }),
+      ev(2, 'turn/start', { turn: 2 }),
+      ev(3, 'turn/end', { turn: 2, reason: { kind: 'completed' } }),
+    ])
+    expect(segment.turns.map(t => [t.firstSeq, t.lastSeq])).toEqual([[0, 1], [2, 3]])
+  })
+
   it('returns no turns for an empty or fully inherited window', () => {
     expect(segmentFromEvents('s', 0, []).turns).toEqual([])
     expect(segmentFromEvents('s', 50, [ev(1, 'turn/start', { turn: 1 })]).turns).toEqual([])

@@ -3,7 +3,7 @@ import { compareBranches } from '../src/client/compare/diff.ts'
 import type { BranchSegment, BranchTurn } from '../src/shared/contracts.ts'
 
 const turn = (index: number, extra: Partial<BranchTurn> = {}): BranchTurn =>
-  ({ index, tools: [], synthetic: false, ...extra })
+  ({ index, firstSeq: index * 10, lastSeq: index * 10 + 9, tools: [], synthetic: false, ...extra })
 
 const segment = (sessionId: string, turns: readonly BranchTurn[], inheritedCount = 0): BranchSegment =>
   ({ sessionId, inheritedCount, turns })

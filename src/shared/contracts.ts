@@ -33,6 +33,16 @@ export interface ForkRequest {
 
 export interface BranchTurn {
   readonly index: number
+  /**
+   * First and last event seq this turn owns inside the branch segment.
+   *
+   * Required by the cut-point mapping the design spec pins down: a row's fork
+   * `atSeq` is the seq immediately before the *next* row's first event, and the
+   * last row cuts at its own last event. Without these the UI could not name a
+   * real cut point, and M0 gate 3 is a per-seq check against known material.
+   */
+  readonly firstSeq: number
+  readonly lastSeq: number
   readonly userMessage?: string
   readonly assistantSummary?: string
   readonly tools: readonly { readonly name: string; readonly status: string }[]

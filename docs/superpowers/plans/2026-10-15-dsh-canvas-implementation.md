@@ -677,10 +677,21 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 **Files:** Create `src/client/ui/RightPanel.tsx`, `src/client/ui/BranchTimeline.tsx`, `src/client/ui/ForkDialog.tsx`, `test/branch-timeline.test.tsx`
 **Interfaces:**
-- `BranchTimeline` props: `{ turns: BranchTurn[]; inheritedCount: number; onFork(rowIndex: number): void; cwdWarning: boolean }` — renders rows; each row shows 「⑂ 从此分叉」; cut label = `seq = next row's first seq - 1`, last row = last event seq; the fork dialog (instruction textarea, mode radio 立即开跑/只建分支, persistent ⚠ shared-cwd line, 取消/创建) is owned by `ForkDialog` with props `{ open, atSeq, inheritedCount, onCancel, onConfirm(instruction, mode) }`.
+- `BranchTimeline` props: `{ turns: readonly BranchTurn[]; inheritedCount: number; onFork(rowIndex: number): void; cwdWarning: boolean }` — renders one row per turn with its `seq first–last` range, the human prompt (or 「（无用户消息）」), the assistant summary, tool count and `endedAs`; each non-synthetic row offers 「⑂ 从此分叉」.
+- `cutSeqAt(turns, rowIndex): number | undefined` — the fork cut for a row.
+- `ForkDialog` props: `{ open; atSeq; inheritedCount; busy?; error?; onCancel(); onConfirm(instruction, mode: LaunchMode) }` — instruction textarea, mode radios 立即开跑/只建分支, a **persistent** ⚠ shared-cwd line, 取消/创建.
+- `RightPanel` props: `{ tab: 'detail' | 'compare'; title?; onTabChange(tab); onClose(); children }`.
 
-- [ ] **Step 1: Failing tests**: rows render with cut labels; clicking a row's fork button calls onFork with that row index; dialog confirm passes text+mode; warning visible.
-- [ ] **Step 2: FAIL → 3: implement → 4: PASS; commit** `feat: branch detail timeline with message-level fork dialog`
+**Task 9 corrections and decisions (verified against local source, 2026-10-16):**
+- **`BranchTurn` had no seq range, so the cut point could not be named at all.** `segmentFromEvents` now records `firstSeq`/`lastSeq` per turn (Task 7 contract extension), which is what the spec's 「每条消息标注事件序号区间」 actually requires.
+- **The cut is the row's own `lastSeq`, not "the seq before the next row's first event".** Those are equal only while seqs are contiguous, and they are not: with a gap (row 0 ends at 4, row 1 starts at 20) the spec's rule yields `19`, which is not an event — and DSH rejects a fork whose `atSeq` is not a real event (`api/session-controller/src/commands.ts:246-254`, "event N does not exist"). Cutting at the row's own last seq is always real, inherits the row in full, and excludes the next row, which is what "fork here" means. Pinned by a test that asserts the two rules differ.
+- **Forking at a synthetic closer row is refused** (button disabled): cutting at fork plumbing is never what the user means.
+- **The dialog names the real cut**: `atSeq` plus `atSeq + 1` inherited events, because `inheritedEventCount = boundary + 1`. The spec's example prose ("seq 47 · inherits 47 events") is off by one; the code is what runs. When the source session is itself a fork, its own inherited count is shown as 「其中 N 个来自更上游」.
+- **The dialog blocks a blank "run now"** (confirm disabled) rather than submitting a request the fork transaction is guaranteed to reject; 「只建分支」 with a blank instruction stays allowed.
+- The shared-cwd warning is permanent in both the timeline and the dialog, not a dismissible toast — v1 branches always share the source cwd.
+
+- [ ] **Step 1: Failing tests**: `cutSeqAt` returns the row's last seq, survives a gap, and is `undefined` out of range; rows render with seq ranges and outcome; `onFork` receives the row index; a synthetic row's fork button is disabled and does not fire; the warning appears only when it applies; the empty state; the placeholder for a turn with no human prompt. Dialog: closed renders nothing; the cut line names `atSeq` and `atSeq + 1`; the warning is always present; confirm passes trimmed text + mode; defaults to `now`; a blank immediate run is blocked while an empty branch is allowed; cancel; error and busy disable confirm. RightPanel: tab switch and close.
+- [ ] **Step 2: implement → 4: PASS; commit** `feat: branch detail timeline with message-level fork dialog`
 
 ---
 

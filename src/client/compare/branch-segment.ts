@@ -70,15 +70,20 @@ export function segmentFromEvents(
 
   for (const event of ordered) {
     const data = isRecord(event.data) ? event.data : undefined
+
+    if (event.type === 'turn/start') {
+      flush()
+      touch(ensure(), event.seq)
+      continue
+    }
+
+    const current = ensure()
+    touch(current, event.seq)
+
     switch (event.type) {
-      case 'turn/start':
-        flush()
-        ensure()
-        break
       case 'turn/end': {
         // No open turn means the cut landed inside a turn that the source
         // session still had open, so the child only owns its synthetic closer.
-        const current = ensure()
         const kind = kindOf(data?.reason)
         if (kind !== undefined) current.endedAs = kind
         if (kind === 'forked') current.synthetic = true
@@ -86,10 +91,9 @@ export function segmentFromEvents(
         break
       }
       case 'session/end-seed':
-        ensure().synthetic = true
+        current.synthetic = true
         break
       case 'user/message': {
-        const current = ensure()
         // A user/message also carries injected context (file-change notices,
         // AGENTS.md, skill content, cron). `source.kind` separates them, which
         // is the same test DSH's own list projection uses for lastPromptAt.
@@ -101,12 +105,10 @@ export function segmentFromEvents(
       }
       case 'assistant/message': {
         const text = textOf(data?.message)
-        if (text !== undefined && text !== '') ensure().assistantTexts.push(text)
-        else ensure()
+        if (text !== undefined && text !== '') current.assistantTexts.push(text)
         break
       }
       case 'tool/call': {
-        const current = ensure()
         const name = typeof data?.name === 'string' ? data.name : undefined
         if (name === undefined) break
         current.callIndex.set(typeof data?.callId === 'string' ? data.callId : '', current.tools.length)
@@ -114,10 +116,7 @@ export function segmentFromEvents(
         break
       }
       case 'tool/result': {
-        const current = ensure()
-        const callId = typeof data?.message === 'object' && data.message !== null
-          ? (data.message as Record<string, unknown>).toolCallId
-          : undefined
+        const callId = isRecord(data?.message) ? data.message.toolCallId : undefined
         const at = typeof callId === 'string' ? current.callIndex.get(callId) : undefined
         // A result whose call sits in the inherited prefix has no name to
         // report here; the call itself is inherited history, not branch work.
@@ -129,7 +128,6 @@ export function segmentFromEvents(
         break
       }
       default:
-        ensure()
         break
     }
   }
@@ -143,8 +141,15 @@ interface Draft {
   assistantTexts: string[]
   tools: { name: string; status: string }[]
   callIndex: Map<string, number>
+  firstSeq?: number
+  lastSeq?: number
   endedAs?: string
   synthetic: boolean
+}
+
+function touch(draft: Draft, seq: number): void {
+  if (draft.firstSeq === undefined) draft.firstSeq = seq
+  draft.lastSeq = seq
 }
 
 function toTurn(draft: Draft, index: number): BranchTurn {
@@ -152,6 +157,8 @@ function toTurn(draft: Draft, index: number): BranchTurn {
   const assistantSummary = bound(draft.assistantTexts.join(''))
   return {
     index,
+    firstSeq: draft.firstSeq ?? 0,
+    lastSeq: draft.lastSeq ?? 0,
     ...(userMessage === '' ? {} : { userMessage }),
     ...(assistantSummary === undefined ? {} : { assistantSummary }),
     tools: draft.tools,
