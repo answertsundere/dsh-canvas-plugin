@@ -1030,6 +1030,18 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 30: deep-optimization rounds 11–14 (2026-10-17, gate-closure + continuing)
+
+- **Gate closure**: the R5–R10 build had never been installed to the profiles (the last install was the Round 4 build) — install-local into `web-0.1.7` and `desktop` plus `m0-check` ×2 (11/11) closed it before anything new shipped.
+- **Round 11**: detail-panel rows carry a per-tool **argument preview** (whitespace-collapsed, 40 chars, `{}`/`[]` skipped, folded through result pairing); rows with previews show a hoverable ⌄ args summary (`data-row-tool-args`).
+- **Round 12**: the swarm header gains a **custom color picker** — a chosen color overrides every palette and persists via localStorage; picking a palette clears it; the picker is skipped cleanly when storage is unavailable.
+- **Round 13**: assignment threads label their shared task at the midpoint (`data-swarm-assign-label`, first 12 chars).
+- **Round 14**: the selected node's minimap dot is enlarged, outlined, and marked `data-minimap-selected`.
+
+**Numbers:** 18 files / **328 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔
