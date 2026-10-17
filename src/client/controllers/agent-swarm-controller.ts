@@ -184,6 +184,12 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
     team = deps.teamOf?.(rootId) ?? null
     const windowsSnapshot = [...knownWindows].map(([sessionId, entries]) => ({ sessionId, entries }))
     nodes = agentsFromWindows(windowsSnapshot, rootId)
+    // Team members hang off the lead even when their session has no catalog
+    // entry — without this they would all stack, unpositioned, at the center.
+    const memberNodes: AgentNode[] = (team?.members ?? [])
+      .filter(member => member.id !== rootId && !nodes.some(node => node.id === member.id))
+      .map(member => ({ id: member.id, parentId: rootId, depth: 1, label: member.name, mode: 'continuable' as const }))
+    nodes = [...nodes, ...memberNodes]
     layout = layoutSwarm(nodes, rootId)
     edges = swarmEdges(nodes, rootId)
     // New agents get a window; a vanished window (cannot happen for append-only

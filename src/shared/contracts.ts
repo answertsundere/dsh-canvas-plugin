@@ -13,6 +13,8 @@ export interface CanvasNode {
   readonly childCount: number
   /** BFS depth from the nearest root; 0 for roots, including external-parent and cycle-promoted roots. */
   readonly depth: number
+  /** Set when this session is a member of the workspace's agent team. */
+  readonly teamRole?: 'lead' | 'teammate'
 }
 
 export interface CanvasGraph {

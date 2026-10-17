@@ -350,3 +350,43 @@ describe('paletteAccent', () => {
     expect(paletteAccent(cyan, 999999)).toBe('#39d0d8')
   })
 })
+
+import { anchoredPan, teamMembersFromList } from '../src/client/swarm/swarm-model.ts'
+
+describe('teamMembersFromList', () => {
+  it('collects members from every session projection, first sighting wins', () => {
+    const members = teamMembersFromList({
+      projectionsBySession: {
+        lead1: { values: { agentTeam: { members: [
+          { id: 'm1', name: '前端', role: 'teammate' },
+          { id: 'lead1', name: 'lead', role: 'lead' },
+        ] } } },
+        lead2: { values: { agentTeam: { members: [
+          { id: 'm1', name: '重名', role: 'teammate' },
+        ] } } },
+      },
+    })
+    expect(members.get('m1')?.name).toBe('前端')
+    expect(members.get('lead1')?.role).toBe('lead')
+    expect(members.size).toBe(2)
+  })
+
+  it('returns an empty map for absent or malformed projections', () => {
+    expect(teamMembersFromList(undefined).size).toBe(0)
+    expect(teamMembersFromList({ projectionsBySession: { a: { values: {} } } }).size).toBe(0)
+  })
+})
+
+describe('anchoredPan', () => {
+  it('keeps the point under the cursor fixed across a zoom', () => {
+    const center = { x: 500, y: 400 }
+    const cursor = { x: 650, y: 480 }
+    const pan = { x: 0, y: 0 }
+    // At scale 1 the content point under the cursor is (150, 80) from origin.
+    const next = anchoredPan(pan, 1, 2, cursor, center)
+    // At scale 2 that same content point must still land on the cursor.
+    const contentX = 150, contentY = 80
+    expect(next.x).toBeCloseTo(cursor.x - center.x - contentX * 2, 5)
+    expect(next.y).toBeCloseTo(cursor.y - center.y - contentY * 2, 5)
+  })
+})

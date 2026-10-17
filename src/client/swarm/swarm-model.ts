@@ -460,3 +460,61 @@ export function paletteAccent(palette: SwarmPalette, now: number): string {
   const hue = Math.round((now / 50) % 360)
   return `hsl(${hue}, 72%, 64%)`
 }
+
+/** A team member as the session list's `agentTeam` projection publishes it. */
+export interface TeamMemberRow {
+  readonly id: string
+  readonly name: string
+  readonly role: 'lead' | 'teammate'
+}
+
+/**
+ * Team members of every projected session, keyed by member session id — the
+ * canvas uses this to show a teammate's team name instead of its prompt, and
+ * to badge it as a team member.
+ */
+export function teamMembersFromList(snapshot: unknown): ReadonlyMap<string, TeamMemberRow> {
+  const members = new Map<string, TeamMemberRow>()
+  if (snapshot === null || typeof snapshot !== 'object') return members
+  const projections = (snapshot as { projectionsBySession?: unknown }).projectionsBySession
+  if (projections === null || typeof projections !== 'object') return members
+  for (const entry of Object.values(projections as Record<string, unknown>)) {
+    if (entry === null || typeof entry !== 'object') continue
+    const values = (entry as { values?: unknown }).values
+    if (values === null || typeof values !== 'object') continue
+    const team = (values as Record<string, unknown>)['agentTeam']
+    if (team === null || typeof team !== 'object') continue
+    const rows = (team as { members?: unknown }).members
+    if (!Array.isArray(rows)) continue
+    for (const row of rows) {
+      if (row === null || typeof row !== 'object') continue
+      const record = row as Record<string, unknown>
+      if (typeof record['id'] !== 'string' || record['id'] === '' || typeof record['name'] !== 'string' || record['name'] === '') continue
+      const role = record['role'] === 'lead' ? 'lead' : 'teammate'
+      // First sighting wins: the lead projection is the authoritative roster.
+      if (!members.has(record['id'])) {
+        members.set(record['id'], { id: record['id'], name: record['name'], role })
+      }
+    }
+  }
+  return members
+}
+
+/**
+ * Pan adjustment that keeps the point under the cursor fixed while the scale
+ * changes from `oldScale` to `newScale` — zoom-at-cursor, not zoom-at-center.
+ */
+export function anchoredPan(
+  pan: { x: number; y: number },
+  oldScale: number,
+  newScale: number,
+  cursor: { x: number; y: number },
+  center: { x: number; y: number },
+): { x: number; y: number } {
+  const contentX = (cursor.x - center.x - pan.x) / oldScale
+  const contentY = (cursor.y - center.y - pan.y) / oldScale
+  return {
+    x: cursor.x - center.x - contentX * newScale,
+    y: cursor.y - center.y - contentY * newScale,
+  }
+}

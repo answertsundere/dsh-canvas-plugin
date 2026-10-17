@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type FC } from 'react'
 import type { AgentSwarmState } from '../controllers/agent-swarm-controller.ts'
 import {
+  anchoredPan,
   fitScale,
   paletteAccent,
   pulseProgress,
@@ -287,7 +288,12 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
         ref={containerRef}
         data-swarm-stage
         onWheel={event => {
-          setZoom(current => Math.min(3, Math.max(0.5, current * (event.deltaY < 0 ? 1.12 : 1 / 1.12))))
+          const rect = event.currentTarget.getBoundingClientRect()
+          const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12
+          const nextZoom = Math.min(3, Math.max(0.5, zoom * factor))
+          // Zoom at the cursor: the point under the pointer stays put.
+          setPan(anchoredPan(pan, scale * zoom, scale * nextZoom, { x: event.clientX - rect.left, y: event.clientY - rect.top }, { x: rect.width / 2, y: rect.height / 2 }))
+          setZoom(nextZoom)
         }}
         onMouseDown={event => {
           dragRef.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y }

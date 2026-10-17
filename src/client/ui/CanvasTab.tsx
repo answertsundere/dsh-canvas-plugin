@@ -60,8 +60,10 @@ const CANVAS_CSS = `
 .dsh-robot-failed { animation: dshRobotShake 0.5s ease-in-out infinite; }
 .dsh-robot-failed .dsh-robot-led { animation: dshRobotLed 0.35s ease-in-out infinite; }
 
-/* A hot thread is a conveyor: dashes flow toward the parent while work runs. */
-.dsh-swarm-hot { stroke-dasharray: 6 6; animation: dshDashFlow 0.8s linear infinite; }
+/* A hot thread is a conveyor: dashes flow toward the parent while work runs,
+   and the thread itself breathes its width. */
+@keyframes dshHotWidth { 0%, 100% { stroke-width: 1.8; } 50% { stroke-width: 3; } }
+.dsh-swarm-hot { stroke-dasharray: 6 6; animation: dshDashFlow 0.8s linear infinite, dshHotWidth 1.2s ease-in-out infinite; }
 `
 
 export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
@@ -191,7 +193,12 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   const needle = query.trim().toLowerCase()
   const selectedNode = selectedId === undefined ? undefined : canvas.graph.nodes.get(selectedId)
 
+  // A pan that started on a card must not end as an accidental selection:
+  // once the pointer travels past the threshold, the click is swallowed.
+  const suppressClick = useRef(false)
+  const dragStart = useRef<{ x: number; y: number } | null>(null)
   const handleNodeClick = (event: ReactMouseEvent<HTMLDivElement>, id: SessionId): void => {
+    if (suppressClick.current) return
     if (event.metaKey || event.ctrlKey) canvas.onToggleCompare(id)
     else canvas.onSelect(id)
   }
@@ -335,10 +342,16 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
               startX: event.clientX, startY: event.clientY,
               viewX: canvas.view.x, viewY: canvas.view.y,
             }
+            dragStart.current = { x: event.clientX, y: event.clientY }
+            suppressClick.current = false
           }}
           onMouseMove={event => {
             const started = drag.current
             if (started === null) return
+            const origin = dragStart.current
+            if (origin !== null && Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 4) {
+              suppressClick.current = true
+            }
             canvas.onViewChange({
               x: started.viewX + (event.clientX - started.startX),
               y: started.viewY + (event.clientY - started.startY),

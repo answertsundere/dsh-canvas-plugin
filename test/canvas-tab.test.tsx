@@ -558,3 +558,24 @@ describe('right-click shortcuts', () => {
     expect(document.querySelector('[data-context-menu]')).toBeNull()
   })
 })
+
+describe('drag threshold', () => {
+  it('panning from a card does not select it', () => {
+    const onSelect = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({ onSelect })} />)
+    const surface = container.querySelector('[data-canvas-surface]') as HTMLElement
+    const card = document.querySelector('[data-canvas-node="a"]') as HTMLElement
+    fireEvent.mouseDown(card, { clientX: 100, clientY: 100 })
+    fireEvent.mouseMove(surface, { clientX: 160, clientY: 140 })
+    fireEvent.mouseUp(surface, { clientX: 160, clientY: 140 })
+    fireEvent.click(card)
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('a plain click still selects', () => {
+    const onSelect = vi.fn()
+    render(<CanvasTab canvas={model({ onSelect })} />)
+    fireEvent.click(document.querySelector('[data-canvas-node="a"]') as Element)
+    expect(onSelect).toHaveBeenCalledWith('a')
+  })
+})

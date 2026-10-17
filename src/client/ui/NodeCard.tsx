@@ -89,6 +89,18 @@ export const NodeCard: FC<NodeCardProps> = ({
       {node.seeded && (
         <span data-node-seeded="true" title="分叉会话" style={{ color: theme.accent, flex: '0 0 auto' }}>⑂</span>
       )}
+      {node.teamRole !== undefined && (
+        <span
+          data-node-team={node.teamRole}
+          title={node.teamRole === 'lead' ? '团队主管' : '团队成员'}
+          style={{
+            flex: '0 0 auto', color: theme.warn, border: `1px solid ${theme.warn}88`,
+            borderRadius: 4, padding: '0 3px', fontSize: 10, lineHeight: '14px',
+          }}
+        >
+          {node.teamRole === 'lead' ? '主管' : '成员'}
+        </span>
+      )}
     </div>
     <div style={{ color: theme.muted, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
       {status.label} · {relativeTime(now, node.createdAt)} · {node.childCount} 分支

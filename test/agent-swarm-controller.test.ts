@@ -274,3 +274,31 @@ describe('agent team linkage', () => {
     controller.dispose()
   })
 })
+
+describe('team members on the web', () => {
+  it('members get ring positions instead of stacking at the center', async () => {
+    const fake = makeDeps({ windows: { root: [] } })
+    const deps: AgentSwarmDeps = {
+      ...fake.deps,
+      teamOf: () => ({
+        members: [
+          { id: 'root', name: 'lead', role: 'lead', phase: 'active' },
+          { id: 'm1', name: '前端', role: 'teammate', phase: 'inactive' },
+          { id: 'm2', name: '后端', role: 'teammate', phase: 'inactive' },
+        ],
+        tasks: [],
+      }),
+    }
+    const controller = createAgentSwarmController(deps, 'root')
+    await flush()
+    const state = controller.state()
+    // Two distinct ring positions — not both at (0, 0) behind the root.
+    const p1 = state.layout.positions.get('m1')
+    const p2 = state.layout.positions.get('m2')
+    expect(p1).toBeDefined()
+    expect(p2).toBeDefined()
+    expect(Math.hypot(p1!.x - p2!.x, p1!.y - p2!.y)).toBeGreaterThan(50)
+    expect(state.edges).toContainEqual({ from: 'root', to: 'm1' })
+    controller.dispose()
+  })
+})

@@ -450,3 +450,31 @@ describe('dispose', () => {
     expect(controller.model().tailOf?.('b')).toBeNull()
   })
 })
+
+describe('team member identity on the canvas', () => {
+  it('a team member shows its team name and role instead of its prompt', () => {
+    const fake = makeDeps({
+      ids: ['lead1', 'mate1'],
+      byId: {
+        lead1: row('lead1', { cwd: 'C:/w', title: '主会话' }),
+        mate1: row('mate1', { parentId: 'lead1', cwd: 'C:/w', title: '你是 Canvas 文件校验员。工作…' }),
+      },
+    })
+    // The session list also carries the agentTeam projection.
+    const base = fake.deps.listSnapshot()
+    const deps: GraphControllerDeps = { ...fake.deps, listSnapshot: () => ({
+      ...(base as Record<string, unknown>),
+      projectionsBySession: {
+        lead1: { values: { agentTeam: { members: [
+          { id: 'lead1', name: 'lead', role: 'lead' },
+          { id: 'mate1', name: '校验员', role: 'teammate' },
+        ] } } },
+      },
+    }) }
+    const controller = createGraphController(deps)
+    const node = controller.model().graph.nodes.get('mate1')
+    expect(node?.title).toBe('校验员')
+    expect(node?.teamRole).toBe('teammate')
+    expect(controller.model().graph.nodes.get('lead1')?.teamRole).toBe('lead')
+  })
+})

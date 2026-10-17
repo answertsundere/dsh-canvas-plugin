@@ -7,6 +7,7 @@ import { deriveStatus, type RuntimeHint } from '../adapters/runtime-status-adapt
 import { inheritedPrefixLength, conclusionFromEvents, segmentFromEvents, type SessionEventLike } from '../compare/branch-segment.ts'
 import { compareBranches } from '../compare/diff.ts'
 import { parallelWriteIds } from '../graph/parallel-write.ts'
+import { teamMembersFromList } from '../swarm/swarm-model.ts'
 import { liveTailFromEntries, type LiveEntryLike, type LiveTail } from '../live/live-tail.ts'
 import { createAgentSwarmController } from './agent-swarm-controller.ts'
 import { runForkTransaction, type ForkDeps, type ForkResult } from './fork-controller.ts'
@@ -200,6 +201,21 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
       toArchivedIds(deps.workspaceSnapshot()),
     )
     graph = buildLineageGraph(selection.members, new Set(selection.members.map(summary => summary.id)))
+
+    // Team members answer to their team name, not to the prompt that spawned
+    // them — and they wear the team role so the canvas can badge them.
+    const memberRows = teamMembersFromList(deps.listSnapshot())
+    if (memberRows.size > 0) {
+      graph = {
+        ...graph,
+        nodes: new Map([...graph.nodes].map(([id, node]) => {
+          const member = memberRows.get(id)
+          return member === undefined
+            ? [id, node]
+            : [id, { ...node, title: member.name, teamRole: member.role }]
+        })),
+      }
+    }
 
     statuses = new Map()
     for (const node of graph.nodes.values()) statuses.set(node.id, statusFor(node, liveTails.get(node.id)))
