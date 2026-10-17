@@ -74,6 +74,13 @@ rough order of risk:
    failure mode is an empty live block, never a broken tab. `src/client/live/live-tail.ts`
    skips unknown chunk kinds rather than throwing; re-verify against
    `api/session-controller/src/client/contract/events.ts` on any upgrade.
+10. **The agent swarm reads `subagent/catalog` durable events.** The roster
+   comes from the parent session's own log (`packages/subagent/subagent/src/catalog.ts`:
+   `{ childId, childCreatedAt, mode, label? }`, appended per direct child). A
+   rename or re-shape of that event, or moving the catalog out of the session
+   log into a separate service, empties the web silently — the swarm is
+   additive, so the failure mode is a root-only view, never a broken tab.
+   Re-verify against the catalog module on any upgrade.
 
 ## Not verified
 

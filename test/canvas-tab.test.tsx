@@ -444,3 +444,37 @@ describe('fork from a live branch', () => {
     expect(document.querySelector('[data-fork-cut]')?.textContent).toContain('seq 4')
   })
 })
+
+describe('agent swarm entry', () => {
+  it('the node card offers the ⌖ entry only when the model can inspect', () => {
+    const onInspect = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({
+      inspectSwarm: () => ({ state: () => swarmStateFake, subscribe: () => () => {}, dispose: onInspect }) as never,
+    })} />)
+    const button = document.querySelector('[data-node-inspect="a"]') as HTMLButtonElement
+    expect(button).not.toBeNull()
+    fireEvent.click(button)
+    expect(document.querySelector('[data-swarm-root]')).not.toBeNull()
+    // Closing releases the controller (the dispose spy is onInspect here).
+    fireEvent.click(document.querySelector('[data-swarm-close]') as Element)
+    expect(onInspect).toHaveBeenCalledTimes(1)
+    expect(document.querySelector('[data-swarm-root]')).toBeNull()
+    void container
+  })
+
+  it('without inspectSwarm the tab shows no entry button and still boots', () => {
+    render(<CanvasTab canvas={model()} />)
+    expect(document.querySelector('[data-node-inspect="a"]')).toBeNull()
+    expect(document.querySelector('[data-canvas-root]')).not.toBeNull()
+  })
+})
+
+const swarmStateFake = {
+  rootId: 'a',
+  rootLabel: 'A',
+  rootSnippet: null,
+  agents: [],
+  edges: [],
+  layout: { positions: new Map(), radius: 230 },
+  heat: new Map(),
+}

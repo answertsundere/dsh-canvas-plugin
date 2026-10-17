@@ -1,5 +1,6 @@
 import type { BranchTurn, CanvasGraph, ComparisonResult, LaunchMode } from '../../shared/contracts.ts'
 import type { LiveTail } from '../live/live-tail.ts'
+import type { AgentSwarmController } from '../controllers/agent-swarm-controller.ts'
 import type { StatusBadge } from '../../shared/status.ts'
 
 /**
@@ -64,6 +65,11 @@ export interface CanvasModel {
   openInChat?(id: string): void
   /** Drops the selection, which closes the right panel. */
   clearSelection?(): void
+  /**
+   * Opens the live agent-web view for one session. The caller owns the
+   * returned controller and must dispose it on close.
+   */
+  inspectSwarm?(id: string): AgentSwarmController
 }
 
 /** The subset of `ForkResult` the tab shows. */

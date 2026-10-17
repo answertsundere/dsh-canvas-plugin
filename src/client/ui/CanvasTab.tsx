@@ -12,6 +12,8 @@ import { RightPanel, type RightPanelTab } from './RightPanel.tsx'
 import { BranchTimeline, cutSeqAt } from './BranchTimeline.tsx'
 import { ForkDialog } from './ForkDialog.tsx'
 import { ComparePanel } from './ComparePanel.tsx'
+import { AgentSwarmView } from './AgentSwarmView.tsx'
+import type { AgentSwarmController } from '../controllers/agent-swarm-controller.ts'
 import type { CanvasDetail, CanvasModel, CanvasView } from './canvas-model.ts'
 
 export interface CanvasTabProps {
@@ -35,6 +37,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   const [forkBusy, setForkBusy] = useState(false)
   const [forkError, setForkError] = useState<string | undefined>(undefined)
   const [carried, setCarried] = useState(false)
+  const [swarm, setSwarm] = useState<AgentSwarmController | null>(null)
   const drag = useRef<{ startX: number; startY: number; viewX: number; viewY: number } | null>(null)
   const [, bump] = useReducer((tick: number) => tick + 1, 0)
 
@@ -53,6 +56,26 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   // updates arrive through the model's own invalidation channel rather than
   // through new props.
   useEffect(() => canvas?.subscribe?.(() => { bump() }), [canvas])
+
+  // The swarm view owns its controller: every open window is a retain, so the
+  // tab disposes it on close and on unmount.
+  const swarmRef = useRef<AgentSwarmController | null>(null)
+  swarmRef.current = swarm
+  useEffect(() => swarm?.subscribe(() => { bump() }), [swarm])
+  useEffect(() => () => { swarmRef.current?.dispose() }, [])
+
+  const openSwarm = (id: string): void => {
+    if (canvas?.inspectSwarm === undefined) return
+    swarmRef.current?.dispose()
+    const next = canvas.inspectSwarm(id)
+    swarmRef.current = next
+    setSwarm(next)
+  }
+  const closeSwarm = (): void => {
+    swarmRef.current?.dispose()
+    swarmRef.current = null
+    setSwarm(null)
+  }
 
   // A node's turns come from its live window while one is open, and from a
   // one-shot read otherwise — including when a running session stops and its
@@ -156,8 +179,11 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   return (
     <div
       data-canvas-root
-      style={{ height: '100%', display: 'flex', flexDirection: 'column', background: theme.bg, color: theme.text }}
+      style={{ height: '100%', display: 'flex', flexDirection: 'column', background: theme.bg, color: theme.text, position: 'relative' }}
     >
+      {swarm !== null && (
+        <AgentSwarmView swarm={swarm.state()} onClose={closeSwarm} />
+      )}
       <div
         data-canvas-toolbar
         style={{
@@ -257,6 +283,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   now={now}
                   onClick={handleNodeClick}
                   onOpen={id => canvas.openInChat?.(id)}
+                  onInspect={canvas.inspectSwarm === undefined ? undefined : openSwarm}
                 />
               )
             })}

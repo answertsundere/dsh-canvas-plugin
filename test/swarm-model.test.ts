@@ -1,0 +1,129 @@
+import { describe, expect, it } from 'vitest'
+import {
+  agentsFromWindows,
+  layoutSwarm,
+  pulseProgress,
+  swarmEdges,
+  type SwarmEntrySource,
+} from '../src/client/swarm/swarm-model.ts'
+
+const catalog = (seq: number, childId: string, label?: string) => ({
+  type: 'event' as const,
+  event: { type: 'subagent/catalog', seq, data: { childId, childCreatedAt: seq, mode: 'continuable', ...(label === undefined ? {} : { label }) } },
+})
+const windowOf = (sessionId: string, entries: unknown[]): SwarmEntrySource => ({ sessionId, entries })
+
+describe('agentsFromWindows', () => {
+  it('lists direct children from the root window catalog events', () => {
+    const agents = agentsFromWindows([
+      windowOf('root', [
+        { type: 'event', event: { type: 'user/message', seq: 1 } },
+        catalog(2, 'a', '检索器'),
+        catalog(3, 'b', '写手'),
+      ]),
+    ], 'root')
+    expect(agents.map(a => a.id).sort()).toEqual(['a', 'b'])
+    expect(agents.find(a => a.id === 'a')).toMatchObject({ parentId: 'root', depth: 1, label: '检索器' })
+  })
+
+  it('stitches grandchildren from child windows, one level deep at most per call', () => {
+    const agents = agentsFromWindows([
+      windowOf('root', [catalog(1, 'a'), catalog(2, 'b')]),
+      windowOf('a', [catalog(5, 'a1', '爬虫')]),
+    ], 'root')
+    expect(agents.find(a => a.id === 'a1')).toMatchObject({ parentId: 'a', depth: 2, label: '爬虫' })
+  })
+
+  it('a later catalog event cannot remove an earlier child (append-only facts)', () => {
+    const agents = agentsFromWindows([
+      windowOf('root', [catalog(1, 'a'), catalog(2, 'b')]),
+      windowOf('root2', [catalog(9, 'a')]),
+    ], 'root')
+    expect(agents.map(a => a.id).sort()).toEqual(['a', 'b'])
+  })
+
+  it('ignores malformed rows and non-catalog events', () => {
+    const agents = agentsFromWindows([
+      windowOf('root', [
+        { type: 'event', event: { type: 'subagent/catalog', seq: 1 } },
+        { type: 'event', event: { type: 'subagent/catalog', seq: 2, data: 'nope' } },
+        catalog(3, 'a'),
+        catalog(4, 'root'),
+      ]),
+    ], 'root')
+    expect(agents.map(a => a.id)).toEqual(['a'])
+  })
+
+  it('caps the swarm size, keeping shallow agents first', () => {
+    const entries = Array.from({ length: 30 }, (_, i) => catalog(i + 1, `c${i}`))
+    const agents = agentsFromWindows([windowOf('root', entries)], 'root', 24)
+    expect(agents.length).toBe(24)
+  })
+})
+
+describe('layoutSwarm', () => {
+  it('places the root at the center and children on one ring', () => {
+    const agents = [
+      { id: 'root', parentId: null, depth: 0, label: 'R', mode: 'continuable' as const },
+      { id: 'a', parentId: 'root', depth: 1, label: 'A', mode: 'one-shot' as const },
+      { id: 'b', parentId: 'root', depth: 1, label: 'B', mode: 'one-shot' as const },
+    ]
+    const layout = layoutSwarm(agents, 'root', { radius: 200 })
+    expect(layout.positions.get('root')).toEqual({ x: 0, y: 0 })
+    const a = layout.positions.get('a')
+    const b = layout.positions.get('b')
+    expect(Math.hypot(a!.x, a!.y)).toBeCloseTo(200, 5)
+    expect(Math.hypot(b!.x, b!.y)).toBeCloseTo(200, 5)
+    // Even angular spacing, deterministic order.
+    expect(a!.x).toBeCloseTo(-b!.x, 5)
+  })
+
+  it('orbits grandchildren around their own parent at a smaller radius', () => {
+    const agents = [
+      { id: 'root', parentId: null, depth: 0, label: 'R', mode: 'continuable' as const },
+      { id: 'a', parentId: 'root', depth: 1, label: 'A', mode: 'one-shot' as const },
+      { id: 'a1', parentId: 'a', depth: 2, label: 'A1', mode: 'one-shot' as const },
+    ]
+    const layout = layoutSwarm(agents, 'root', { radius: 200, childRadius: 90 })
+    const a = layout.positions.get('a')!
+    const a1 = layout.positions.get('a1')!
+    expect(Math.hypot(a1.x - a.x, a1.y - a.y)).toBeCloseTo(90, 5)
+  })
+
+  it('every agent gets a finite position, unreachable ones included', () => {
+    const agents = [
+      { id: 'root', parentId: null, depth: 0, label: 'R', mode: 'continuable' as const },
+      { id: 'x', parentId: 'missing', depth: 1, label: 'X', mode: 'one-shot' as const },
+    ]
+    const layout = layoutSwarm(agents, 'root')
+    for (const id of ['root', 'x']) {
+      const p = layout.positions.get(id)!
+      expect(Number.isFinite(p.x)).toBe(true)
+      expect(Number.isFinite(p.y)).toBe(true)
+    }
+  })
+})
+
+describe('swarmEdges', () => {
+  it('one edge per non-root agent, child to parent', () => {
+    const agents = [
+      { id: 'root', parentId: null, depth: 0, label: 'R', mode: 'continuable' as const },
+      { id: 'a', parentId: 'root', depth: 1, label: 'A', mode: 'one-shot' as const },
+      { id: 'a1', parentId: 'a', depth: 2, label: 'A1', mode: 'one-shot' as const },
+    ]
+    expect(swarmEdges(agents, 'root')).toEqual([
+      { from: 'root', to: 'a' },
+      { from: 'a', to: 'a1' },
+    ])
+  })
+})
+
+describe('pulseProgress', () => {
+  it('cycles from 0 to 1 while the edge is hot, then goes cold', () => {
+    expect(pulseProgress(10_000, 10_000, 2_000)).toBe(0)
+    expect(pulseProgress(10_000, 11_000, 2_000)).toBe(0.5)
+    expect(pulseProgress(10_000, 12_000, 2_000)).toBe(0)
+    // Cold after the grace window: no pulse is drawn.
+    expect(pulseProgress(10_000, 10_000 + 2_000 + 1_500 + 1, 2_000)).toBeNull()
+  })
+})

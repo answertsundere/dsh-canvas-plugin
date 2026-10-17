@@ -8,6 +8,7 @@ import { inheritedPrefixLength, segmentFromEvents, type SessionEventLike } from 
 import { compareBranches } from '../compare/diff.ts'
 import { parallelWriteIds } from '../graph/parallel-write.ts'
 import { liveTailFromEntries, type LiveEntryLike, type LiveTail } from '../live/live-tail.ts'
+import { createAgentSwarmController } from './agent-swarm-controller.ts'
 import { runForkTransaction, type ForkDeps, type ForkResult } from './fork-controller.ts'
 import { IDENTITY_VIEW, type CanvasDetail, type CanvasModel, type CanvasView } from '../ui/canvas-model.ts'
 
@@ -87,6 +88,7 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
   const liveTails = new Map<SessionId, LiveTail | null>()
   const liveDetails = new Map<SessionId, CanvasDetail>()
   const pendingWindows = new Set<SessionId>()
+  const liveWindow = deps.liveWindow
 
   const notify = (): void => {
     for (const listener of [...listeners]) listener()
@@ -318,6 +320,14 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
     liveDetail: id => liveDetails.get(id) ?? null,
     tailOf: id => liveTails.get(id) ?? null,
     comparison: compare,
+    inspectSwarm: liveWindow === undefined ? undefined : id => createAgentSwarmController({
+      liveWindow,
+      listSummaries: () => toSummaries(deps.listSnapshot()).map(summary => ({
+        id: summary.id,
+        ...(summary.title === undefined ? {} : { title: summary.title }),
+        running: summary.running,
+      })),
+    }, id),
     forkFromRow,
     openInChat,
     clearSelection: () => {

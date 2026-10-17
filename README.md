@@ -20,6 +20,7 @@ DSH supports forking natively and the sidebar lists sessions, but:
 - **Deterministic comparison** — compares only events after each branch's `inheritedEventCount`, aligned positionally, never semantically. 「Carry conclusion」 produces an **editable draft** and never submits.
 - **Three-state status** — confirmed (idle/queued/failed/done), inferred (thinking/tool), unknown (disconnected). **Never infers idle from silence.**
 - **Live streaming output** — a running branch's in-flight assistant stream is visible on the canvas: the node card shows the newest line (reasoning / answer / tool), and the selected branch's detail panel shows the full live reasoning and answer text, updated per chunk and folded into the turn list when the durable message settles. While a stream is visible the status badge is driven by it (thinking vs tool), so a running node is no longer a guess.
+- **Agent swarm web** — the ⌖ corner button on a node card opens that session's own live view: the parent agent at the center, its subagents on the ring around it. When an agent emits, its spoke lights up and a glowing dot crawls toward the parent (spider-web effect), with the agent's newest line on its chip. The roster comes from the session log's `subagent/catalog` events, so a freshly spawned agent joins the web instantly.
 
 ## Install
 

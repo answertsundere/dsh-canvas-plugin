@@ -863,6 +863,25 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 18: Agent 实况 — the per-session agent web (2026-10-17, user-requested)
+
+**Request (user):** click into a session and see how many agents it has and what each is doing, live, with a spider-web crawling animation.
+
+**Contract, verified against the checkout:** enumeration needs no new service — a parent records one durable `subagent/catalog` event per direct child in its own session log (`packages/subagent/subagent/src/catalog.ts`: `{ childId, childCreatedAt, mode: 'one-shot'|'continuable'|'unknown', label? }`, chunked-list folded). The event windows the canvas already opens therefore carry the whole swarm, and a freshly spawned agent arrives as an ordinary window change. Each child is itself a session, readable through the same `openLiveWindow`.
+
+**Implementation:**
+- `src/client/swarm/swarm-model.ts` (pure): `agentsFromWindows` merges catalog facts append-only across readable windows (only the root and known agents contribute children; first sighting wins; malformed rows skipped; cap 24, shallow first). `layoutSwarm` is a deterministic radial web — root at origin, depth-1 agents evenly on the main ring, deeper agents orbiting their parent, orphans still placed. `pulseProgress(heat, now)` turns a last-activity timestamp into a 0→1 crawl per cycle plus one grace cycle, then `null`.
+- `src/client/controllers/agent-swarm-controller.ts`: one live window per agent (same adapter), tails per agent via the shared live-tail module, per-agent heat stamped on window change, catalog changes reopen/close windows, `dispose` releases everything. Status per agent: streaming (tail live) / running (list row) / idle.
+- `src/client/ui/AgentSwarmView.tsx`: the 「Agent 实况」 overlay — SVG web, glowing hot edges, a pulse dot crawling child→parent per hot spoke (60fps-free: a 60ms tick; `nowMs` freezes the clock for tests), agent chips with status dot + live snippet, a root chip showing what the inspected session itself is emitting. Entry: a ⌖ corner button on every node card; the tab owns the controller and disposes it on close/unmount.
+
+**Evidence:** entry, render, and close round-trip verified live on the real workspace (⌖ opens the web with the session's real title as the root chip; 返回画布 closes it and the canvas is intact; 0 pageerrors). **No session in this workspace has ever emitted `subagent/catalog` events** (the user's multi-agent work runs on Hermes, a different harness; the probe prompt also produced none — the web profile's model did not spawn subagents), so a filled web is pinned by 16 unit tests (catalog parsing, incremental agent appearance, stitching, layout, pulses) and awaits a real subagent-using session to light up. Documented as such rather than claimed.
+
+**Environment note:** two boots failed with `EADDRINUSE 3090` because `TaskStop` on the shell does not kill the underlying `dsh` process — kill the PID from `netstat -ano | findstr :3090` before rebooting.
+
+**Numbers:** 18 files / **234 tests** green; bundle 108.99 kB / gzip 28.98 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔

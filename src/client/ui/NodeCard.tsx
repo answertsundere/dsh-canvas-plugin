@@ -23,10 +23,12 @@ export interface NodeCardProps {
   onClick(event: MouseEvent<HTMLDivElement>, id: string): void
   /** Opens the session in the conversation view. */
   onOpen?(id: string): void
+  /** Opens the live agent-web view for this session. */
+  onInspect?(id: string): void
 }
 
 export const NodeCard: FC<NodeCardProps> = ({
-  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, now, onClick, onOpen,
+  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, now, onClick, onOpen, onInspect,
 }) => (
   <div
     data-canvas-node={node.id}
@@ -76,6 +78,23 @@ export const NodeCard: FC<NodeCardProps> = ({
       {status.label} · {relativeTime(now, node.createdAt)} · {node.childCount} 分支
       {node.externalParent && <span title="父会话不在当前工作区"> · 外部父</span>}
     </div>
+    {onInspect !== undefined && (
+      <button
+        type="button"
+        data-node-inspect={node.id}
+        title="Agent 实况"
+        onClick={event => { event.stopPropagation(); onInspect(node.id) }}
+        style={{
+          position: 'absolute', top: 5, right: 5,
+          width: 20, height: 20, lineHeight: '17px', textAlign: 'center',
+          background: theme.card, color: theme.muted,
+          border: `1px solid ${theme.border}`, borderRadius: 6,
+          font: '12px system-ui, sans-serif', cursor: 'pointer', padding: 0,
+        }}
+      >
+        ⌖
+      </button>
+    )}
     {live != null && (
       <div
         data-node-live
