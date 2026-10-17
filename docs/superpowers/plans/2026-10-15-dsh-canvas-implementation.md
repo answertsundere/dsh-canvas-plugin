@@ -698,10 +698,16 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 ### Task 10: Compare panel — comparison, 择优继续, 带回结论
 
 **Files:** Create `src/client/ui/ComparePanel.tsx`, `test/compare-panel.test.tsx`
-**Interfaces:** `ComparePanel` props: `{ result: ComparisonResult | null; onContinue(side: 'a' | 'b'): void; onCarry(side: 'a' | 'b', draft: string): void }` — A|B columns (last conclusion + turn diff rows + tool counts + inherited counts shown); 带回结论 produces an **editable draft** in a textarea (never auto-submits): `参考另一分支的结论：<summary>。现在结合两者继续：`.
+**Interfaces:** `ComparePanel` props: `{ result: ComparisonResult | null; onContinue(side: 'a' | 'b'): void; onCarry(side: 'a' | 'b', draft: string): void }` — A|B summary (inherited prefix + tool count per side, tool-count difference, both-failed notice), both last conclusions, one row per `turnDiffs` entry, and the actions.
 
-- [ ] **Step 1: Failing tests**: empty state message; side-by-side render with inherited counts; 择优继续 calls onContinue; carry fills the editable draft and does NOT call submit.
-- [ ] **Step 2: FAIL → 3: implement → 4: PASS; commit** `feat: branch comparison panel with continue and carry-forward draft`
+**Task 10 decisions (2026-10-16):**
+- **「带回结论」 has two steps, and the first sends nothing.** Clicking it only fills an editable textarea with `参考另一分支的结论：<对方的结论>。现在结合两者继续：`; `onCarry` fires only from a second, explicit 「放入输入框」 action, by which point the user has seen and edited the text. This is the design spec's rule made structural — an external branch's conclusion is reference material and carries no execution authority.
+- Each carry button carries the **other** side's conclusion (`带回 B 的结论` on the A side), so `side` is the branch being continued in and the summary is the other branch's. When the other side has no conclusion the draft says 「（对方没有结论）」 rather than emitting a blank sentence.
+- Per-side conclusions are read from that side's last **non-synthetic** turn, matching `compareBranches`' own rule, so the panel and the diff can never disagree. `lastConclusion.side` is surfaced as a factual note (「两边一致」 / 「更完整」) rather than as a recommendation — the rule picks the longer text, not the better one.
+- A 取消 discards the draft and hands nothing over.
+
+- [ ] **Step 1: Failing tests**: empty state message; per-side inherited counts and tool counts plus the difference; both-failed notice; one row per diff with unequal marking and a missing side; conclusions per side and the identical case; 择优继续 calls `onContinue`; carry fills the draft and does **not** call `onCarry`; the edited draft is what gets handed over; carrying works in both directions; the no-conclusion placeholder; 取消 hands nothing over.
+- [ ] **Step 2: implement → 4: PASS; commit** `feat: branch comparison panel with continue and carry-forward draft`
 
 ---
 
