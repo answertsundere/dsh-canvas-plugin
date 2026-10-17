@@ -1,6 +1,7 @@
-import { useEffect, useState, type CSSProperties, type FC } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type FC } from 'react'
 import type { AgentSwarmState } from '../controllers/agent-swarm-controller.ts'
 import {
+  fitScale,
   pulseProgress,
   sweepProgress,
   toolGlyph,
@@ -41,13 +42,16 @@ const chipStyle = (streaming: boolean): CSSProperties => ({
   userSelect: 'none',
 })
 
-const statusColor = (status: 'streaming' | 'running' | 'idle'): string =>
-  status === 'streaming' ? theme.accent : status === 'running' ? theme.warn : theme.muted
+const statusColor = (status: 'streaming' | 'running' | 'idle' | 'failed'): string =>
+  status === 'streaming' ? theme.accent
+    : status === 'running' ? theme.warn
+      : status === 'failed' ? '#e0554d' : theme.muted
 
-const AGENT_ROBOT: Record<'streaming' | 'running' | 'idle', RobotState> = {
+const AGENT_ROBOT: Record<'streaming' | 'running' | 'idle' | 'failed', RobotState> = {
   streaming: 'working',
   running: 'working',
   idle: 'idle',
+  failed: 'failed',
 }
 
 const TOOL_ROBOT: Record<'pending' | 'ok' | 'error', RobotState> = {
@@ -169,6 +173,22 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
   }, [nowMs])
   const now = nowMs ?? tick
 
+  // Fit the fixed plane into whatever room the overlay has: the web must never
+  // require scrolling. Measured, not assumed; unknown sizes read as 1:1.
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const [scale, setScale] = useState(1)
+  useEffect(() => {
+    const element = containerRef.current
+    if (element === null || typeof ResizeObserver === 'undefined') return
+    const measure = (): void => {
+      setScale(fitScale(element.clientWidth, element.clientHeight, VIEW.width, VIEW.height))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => { observer.disconnect() }
+  }, [])
+
   const positionOf = (id: string): { x: number; y: number } => swarm.layout.positions.get(id) ?? { x: 0, y: 0 }
   const toolPositionOf = (id: string): { x: number; y: number } => swarm.toolLayout.positions.get(id) ?? { x: 0, y: 0 }
   const agents = swarm.agents
@@ -176,6 +196,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
   const pendingTool = tools.find(tool => tool.id === swarm.activity.pendingToolId) ?? null
   const groups = turnGroups(tools)
   const rootTodos = swarm.todos.get(swarm.rootId)
+  const teamTasks = (swarm.team?.tasks ?? []).filter(task => task.status !== 'deleted')
   const rootHeat = swarm.heat.get(swarm.rootId)
   const rootHot = rootHeat !== undefined && pulseProgress(rootHeat, now) !== null
 
@@ -204,6 +225,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
         <span style={{ color: theme.muted }}>
           {agents.length} 个 agent · 近 {swarm.activity.turnCount + (swarm.activity.openTurn ? 1 : 0)} 轮
           {swarm.activity.openTurn ? '（进行中）' : ''}
+          {swarm.team != null ? ` · 团队 ${swarm.team.members.length} 人` : ''}
           {pendingTool !== null ? ` · 正在 ${pendingTool.name}` : ''}
         </span>
         <button
@@ -220,12 +242,14 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
         </button>
       </div>
 
-      <div style={{ position: 'relative', flex: '1 1 auto', overflow: 'hidden' }}>
+      <div ref={containerRef} style={{ position: 'relative', flex: '1 1 auto', overflow: 'hidden' }}>
         <div
+          data-swarm-plane
           style={{
             position: 'absolute', left: '50%', top: '50%',
             width: VIEW.width, height: VIEW.height,
-            marginLeft: -VIEW.width / 2, marginTop: -VIEW.height / 2,
+            transform: `translate(-50%, -50%) scale(${scale})`,
+            transformOrigin: 'center center',
           }}
         >
           <svg
@@ -355,18 +379,34 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
           {agents.map(agent => {
             const p = positionOf(agent.id)
             return (
-              <div key={agent.id} data-swarm-agent={agent.id} style={{ ...chipStyle(agent.status === 'streaming'), left: VIEW.width / 2 + p.x, top: VIEW.height / 2 + p.y }}>
+              <div
+                key={agent.id}
+                data-swarm-agent={agent.id}
+                style={{
+                  ...chipStyle(agent.status === 'streaming'),
+                  left: VIEW.width / 2 + p.x,
+                  top: VIEW.height / 2 + p.y,
+                  outline: `1px dashed ${statusColor(agent.status)}`,
+                  outlineOffset: 4,
+                }}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <RobotAvatar
-                    size={26}
+                    size={34}
                     color={statusColor(agent.status)}
                     state={AGENT_ROBOT[agent.status]}
                     variant="agent"
                     statusAttr={{ name: 'data-swarm-status', value: agent.status }}
                   />
-                  <span style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {agent.label}
-                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {agent.label}
+                    </div>
+                    <div style={{ color: theme.muted, fontSize: 10 }}>
+                      {agent.role === 'teammate' ? '团队成员' : agent.role === 'lead' ? '团队主管' : '子代理'}
+                      {agent.status === 'failed' ? ' · 失败' : ''}
+                    </div>
+                  </div>
                 </div>
                 {agent.snippet !== null && (
                   <div
@@ -416,10 +456,11 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                 }}
               >
                 <RobotAvatar
-                  size={20}
+                  size={18}
                   color={failed ? '#e0554d' : visual.color}
                   state={TOOL_ROBOT[tool.status]}
                   variant={visual.variant}
+                  mount="pedestal"
                 />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.name}</span>
                 <span style={{ flex: '0 0 auto', color: failed ? '#e0554d' : theme.muted }}>
@@ -470,6 +511,24 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
               </div>
             )}
             {rootTodos === undefined ? null : <TodoList items={rootTodos} limit={7} />}
+            {teamTasks.length > 0 && (
+              <div data-swarm-team-tasks style={{ marginTop: 6, borderTop: `1px solid ${theme.border}`, paddingTop: 4 }}>
+                <div style={{ color: theme.muted, marginBottom: 2 }}>
+                  团队任务 {teamTasks.filter(task => task.status === 'completed').length}/{teamTasks.length}
+                </div>
+                {teamTasks.slice(0, 5).map(task => (
+                  <div key={task.id} data-swarm-team-task-status={task.status} style={{ display: 'flex', gap: 4, color: task.status === 'completed' ? theme.muted : theme.text }}>
+                    <span style={{ flex: '0 0 auto', color: task.status === 'completed' ? '#2f9e6f' : task.status === 'in_progress' ? theme.warn : theme.muted }}>
+                      {task.status === 'completed' ? '✓' : task.status === 'in_progress' ? '◐' : '○'}
+                    </span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {task.subject}
+                      {task.ownerName !== undefined ? ` · ${task.ownerName}` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

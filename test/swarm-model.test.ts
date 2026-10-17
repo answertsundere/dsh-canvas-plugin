@@ -128,7 +128,7 @@ describe('pulseProgress', () => {
   })
 })
 
-import { activityFromEntries } from '../src/client/swarm/swarm-model.ts'
+import { activityFromEntries, fitScale } from '../src/client/swarm/swarm-model.ts'
 import { layoutActivity } from '../src/client/swarm/swarm-model.ts'
 
 const call = (seq: number, callId: string, name: string) => ({
@@ -191,14 +191,50 @@ describe('activityFromEntries', () => {
 })
 
 describe('layoutActivity', () => {
-  it('places tool nodes evenly on their own outer ring', () => {
+  it('spirals outward in execution order, so the sequence is visible', () => {
     const activity = activityFromEntries([call(1, 'c1', 'a'), call(2, 'c2', 'b'), call(3, 'c3', 'c')])
-    const layout = layoutActivity(activity.tools, 340)
-    expect(layout.positions.size).toBe(3)
-    for (const tool of activity.tools) {
+    const layout = layoutActivity(activity.tools, { baseRadius: 240, radialStep: 26, angularStep: 0.62 })
+    const radii = activity.tools.map(tool => {
       const p = layout.positions.get(tool.id)!
-      expect(Math.hypot(p.x, p.y)).toBeCloseTo(340, 5)
-    }
+      return Math.hypot(p.x, p.y)
+    })
+    expect(radii[0]).toBeCloseTo(240, 5)
+    expect(radii[1]).toBeCloseTo(266, 5)
+    expect(radii[2]).toBeCloseTo(292, 5)
+    expect(layout.maxRadius).toBeCloseTo(292, 5)
+  })
+
+  it('a turn boundary adds an angular gap and a radial lift', () => {
+    const tools = [
+      { id: 'a', name: 'x', status: 'ok' as const, turn: 0 },
+      { id: 'b', name: 'y', status: 'ok' as const, turn: 1 },
+    ]
+    const layout = layoutActivity(tools, { baseRadius: 240, radialStep: 26, angularStep: 0.62, turnGap: 0.5, turnLift: 18 })
+    const a = layout.positions.get('a')!
+    const b = layout.positions.get('b')!
+    const angleA = Math.atan2(a.y, a.x)
+    const angleB = Math.atan2(b.y, b.x)
+    // Step = 0.62 + turn gap 0.5 across the boundary.
+    expect(angleB - angleA).toBeCloseTo(0.62 + 0.5, 5)
+    expect(Math.hypot(b.x, b.y)).toBeCloseTo(240 + 26 + 18, 5)
+  })
+
+  it('an empty list has no positions and the base radius as its bound', () => {
+    const layout = layoutActivity([])
+    expect(layout.positions.size).toBe(0)
+    expect(layout.maxRadius).toBe(240)
+  })
+})
+
+describe('fitScale', () => {
+  it('fits the plane into the container without enlarging past 1:1', () => {
+    expect(fitScale(1960, 1600, 980, 800)).toBe(1)
+    expect(fitScale(700, 800, 980, 800)).toBeCloseTo((700 - 32) / 980, 5)
+  })
+
+  it('never shrinks below the legibility floor and treats unknown sizes as 1', () => {
+    expect(fitScale(100, 100, 980, 800)).toBe(0.35)
+    expect(fitScale(0, 0, 980, 800)).toBe(1)
   })
 })
 

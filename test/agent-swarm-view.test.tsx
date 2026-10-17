@@ -13,8 +13,9 @@ const swarmState = (over: Partial<AgentSwarmState> = {}): AgentSwarmState => ({
   rootLabel: '长任务会话',
   rootSnippet: { label: '输出', text: '正在汇总各路结果' },
   activity: { turnCount: 0, openTurn: false, currentTurn: null, tools: [], pendingToolId: null },
-  toolLayout: { positions: new Map() },
+  toolLayout: { maxRadius: 400, positions: new Map() },
   todos: new Map(),
+  team: null,
   agents: [
     { id: 'a', label: '检索器', depth: 1, status: 'streaming', snippet: { label: '推理', text: '正在翻资料' }, tail: null },
     { id: 'b', label: '写手', depth: 1, status: 'idle', snippet: null, tail: null },
@@ -83,6 +84,7 @@ const activityState = (over: Partial<AgentSwarmState> = {}): AgentSwarmState => 
     pendingToolId: 'c2',
   },
   toolLayout: {
+    maxRadius: 400,
     positions: new Map([['c1', { x: 120, y: -200 }], ['c2', { x: -120, y: -200 }]]),
   },
   heat: new Map([['a', NOW - 500], ['tool:c2', NOW - 300]]),
@@ -172,7 +174,7 @@ describe('robot avatars', () => {
         tools: [{ id: 'x', name: 'pwsh', status: 'error', turn: 1 }],
         pendingToolId: null,
       },
-      toolLayout: { positions: new Map([['x', { x: 100, y: -200 }]]) },
+      toolLayout: { maxRadius: 400, positions: new Map([['x', { x: 100, y: -200 }]]) },
     })
     render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
     const robot = document.querySelector('[data-swarm-tool="x"] [data-robot]')
@@ -203,7 +205,7 @@ describe('robot variant identity', () => {
         ],
         pendingToolId: null,
       },
-      toolLayout: { positions: new Map([['t1', { x: 0, y: -300 }], ['t2', { x: 100, y: -280 }], ['t3', { x: 200, y: -200 }], ['t4', { x: 280, y: -100 }], ['t5', { x: 300, y: 0 }], ['t6', { x: 280, y: 100 }]]) },
+      toolLayout: { maxRadius: 400, positions: new Map([['t1', { x: 0, y: -300 }], ['t2', { x: 100, y: -280 }], ['t3', { x: 200, y: -200 }], ['t4', { x: 280, y: -100 }], ['t5', { x: 300, y: 0 }], ['t6', { x: 280, y: 100 }]]) },
     })
     render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
     const variantOf = (id: string): string | null | undefined =>
@@ -222,5 +224,38 @@ describe('robot variant identity', () => {
     expect(document.querySelector('[data-swarm-root-agent="true"] [data-robot]')?.getAttribute('data-robot-variant')).toBe('root')
     // Agents wear headsets.
     expect(document.querySelector('[data-swarm-agent="a"] [data-robot]')?.getAttribute('data-robot-variant')).toBe('agent')
+  })
+})
+
+describe('species split, scaling, and team tasks', () => {
+  it('agents carry a dashed aura and a role label; tools stand on pedestals', () => {
+    const { container } = render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={NOW} />)
+    const agentChip = document.querySelector('[data-swarm-agent="a"]') as HTMLElement
+    expect(agentChip.style.outline).toContain('dashed')
+    expect(agentChip.textContent).toContain('子代理')
+    expect(container.querySelector('[data-swarm-tool="c1"] [data-robot-mount="pedestal"]')).not.toBeNull()
+    expect(container.querySelector('[data-swarm-agent="a"] [data-robot-mount]')).toBeNull()
+  })
+
+  it('renders team tasks in the root card and the header count', () => {
+    const state = activityState({
+      team: {
+        members: [{ id: 'root', name: 'lead', role: 'lead', phase: 'active' }],
+        tasks: [
+          { id: 't1', subject: '搭框架', status: 'completed' },
+          { id: 't2', subject: '写接口', status: 'in_progress', ownerName: '后端' },
+        ],
+      },
+    })
+    const { container } = render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(container.textContent).toContain('团队 1 人')
+    expect(container.textContent).toContain('团队任务 1/2')
+    expect(container.querySelector('[data-swarm-team-task-status="in_progress"]')?.textContent).toContain('写接口')
+  })
+
+  it('the web sits on a fit-scaled plane so it never needs scrolling', () => {
+    render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={NOW} />)
+    const plane = document.querySelector('[data-swarm-plane]') as HTMLElement
+    expect(plane.style.transform).toContain('scale')
   })
 })

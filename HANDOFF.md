@@ -13,9 +13,9 @@
 
 | 维度 | 状态 |
 |---|---|
-| 计划任务 | 24/24 完成（…24 机器人化身 + 律动、**25 十种独立机器人形象**） |
-| 测试 | **18 文件 / 278 测试全绿**（`vitest run`） |
-| 构建 | typecheck 干净；`lib/client.js` 155.84 kB / gzip 38.72 kB，lazy-CJS banner 完好 |
+| 计划任务 | 25/25 完成（…25 十种机器人形象、**26 自适应缩放 + 螺旋布局 + 物种分离 + 智能体团队联动**） |
+| 测试 | **18 文件 / 287 测试全绿**（`vitest run`） |
+| 构建 | typecheck 干净；`lib/client.js` 163.09 kB / gzip 40.46 kB，lazy-CJS banner 完好 |
 | 安装 | **两个 profile 都已装**（Task 17 后已重装）：`web-0.1.7` 与 `desktop` 副本与 `lib/client.js` **逐字节一致**，`m0-check` 均 11/11 |
 | M0 关卡 | 1 **PASS（DOM，含卸载往返）**；2/5/6/7/12 UNIT（2 另有真实数据证据）；4 UNIT+SRC；9 UNIT（flap 语义）；10 **PASS（500 节点实测）**；3 UNIT；**8 PASS（真实观察：两子分支并行 running=2 + 实时流片段）**；11 PARTIAL（retainInfo 残留未实测，dispose 释放窗口已有单测） |
 | 发布 | **阻塞**：npm 包名 `dsh-canvas` 被占用，需 `@<scope>/dsh-canvas`（见 §7 决策点） |

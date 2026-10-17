@@ -479,6 +479,7 @@ const swarmStateFake = {
   activity: { turnCount: 0, openTurn: false, currentTurn: null, tools: [], pendingToolId: null },
   toolLayout: { positions: new Map() },
   todos: new Map(),
+  team: null,
   heat: new Map(),
 }
 

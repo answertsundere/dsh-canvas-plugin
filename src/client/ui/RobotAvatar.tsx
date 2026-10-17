@@ -9,6 +9,8 @@ export interface RobotAvatarProps {
   readonly color: string
   readonly state: RobotState
   readonly variant?: RobotVariant
+  /** `pedestal` draws a base plate: tools are deployed equipment, not people. */
+  readonly mount?: 'pedestal'
   /** Set on the wrapper so callers can keep their own status attribute. */
   readonly statusAttr?: { readonly name: string; readonly value: string }
 }
@@ -226,17 +228,21 @@ const VariantBody: FC<PartProps & { readonly variant: RobotVariant }> = ({ color
  * robots bob with swinging arms and a blinking antenna LED, idle ones breathe,
  * failed ones shake, finished ones stand still with green eyes.
  */
-export const RobotAvatar: FC<RobotAvatarProps> = ({ size = 26, color, state, variant = 'generic', statusAttr }) => (
+export const RobotAvatar: FC<RobotAvatarProps> = ({ size = 26, color, state, variant = 'generic', mount, statusAttr }) => (
   <span
     data-robot
     data-robot-state={state}
     data-robot-variant={variant}
+    data-robot-mount={mount}
     className={`dsh-robot dsh-robot-${state}`}
     style={{ display: 'inline-block', flex: '0 0 auto', width: size, height: size * 1.1 }}
     {...(statusAttr === undefined ? {} : { [statusAttr.name]: statusAttr.value })}
   >
     <svg viewBox="0 0 40 44" width="100%" height="100%" aria-hidden="true">
       <VariantBody color={color} state={state} variant={variant} />
+      {mount === 'pedestal' && (
+        <rect data-robot-part="pedestal" x="8" y="41.4" width="24" height="2.2" rx="1.1" fill={color} opacity="0.45" />
+      )}
     </svg>
   </span>
 )

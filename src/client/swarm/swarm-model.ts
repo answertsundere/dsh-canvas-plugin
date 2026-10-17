@@ -268,22 +268,59 @@ export function activityFromEntries(entries: readonly LiveEntryLike[], cap = ACT
 }
 
 /**
- * The activity ring: tool chips evenly spaced on their own circle outside the
- * agent ring, so a single-agent session still fills the web with its work.
+ * The activity spiral: tools laid along a spider-web spiral in execution
+ * order — each step turns further and drifts outward, and a turn boundary
+ * adds an extra angular gap plus a small radial lift, so the shape reads as a
+ * process (turn 1 here, turn 2 there) instead of a uniform ring. Newest work
+ * sits furthest out, which is where the eye lands last.
  */
 export function layoutActivity(
   tools: readonly ActivityTool[],
-  radius = 340,
-): { positions: ReadonlyMap<string, { x: number; y: number }> } {
+  opts: { baseRadius?: number; radialStep?: number; angularStep?: number; turnGap?: number; turnLift?: number } = {},
+): { positions: ReadonlyMap<string, { x: number; y: number }>; maxRadius: number } {
+  const baseRadius = opts.baseRadius ?? 240
+  const radialStep = opts.radialStep ?? 26
+  const angularStep = opts.angularStep ?? 0.62
+  const turnGap = opts.turnGap ?? 0.5
+  const turnLift = opts.turnLift ?? 18
   const positions = new Map<string, { x: number; y: number }>()
-  tools.forEach((tool, index) => {
-    const angle = -Math.PI / 2 + (2 * Math.PI * index) / Math.max(tools.length, 1)
-    positions.set(tool.id, {
-      x: radius * Math.cos(angle),
-      y: radius * Math.sin(angle),
-    })
+  let angle = -Math.PI / 2
+  let radius = baseRadius
+  let previousTurn: number | null = null
+  tools.forEach(tool => {
+    if (previousTurn !== null && tool.turn !== previousTurn) {
+      angle += turnGap
+      radius += turnLift
+    }
+    positions.set(tool.id, { x: radius * Math.cos(angle), y: radius * Math.sin(angle) })
+    previousTurn = tool.turn
+    angle += angularStep
+    radius += radialStep
   })
-  return { positions }
+  const maxRadius = tools.length === 0 ? baseRadius : radius - radialStep
+  return { positions, maxRadius }
+}
+
+/**
+ * Scale that fits the fixed-size web plane into the measured container
+ * (never enlarging past 1:1, never shrinking past 0.35 so labels stay
+ * legible). Zero or unknown measurements read as 1 — jsdom and the first
+ * paint before measurement.
+ */
+export function fitScale(
+  containerWidth: number,
+  containerHeight: number,
+  viewWidth: number,
+  viewHeight: number,
+  margin = 32,
+): number {
+  if (containerWidth <= 0 || containerHeight <= 0) return 1
+  const scale = Math.min(
+    (containerWidth - margin) / viewWidth,
+    (containerHeight - margin) / viewHeight,
+    1,
+  )
+  return Math.max(0.35, scale)
 }
 
 /** One line of an agent's todo list (`todo/write` whole-list snapshots). */

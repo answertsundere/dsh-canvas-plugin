@@ -972,6 +972,22 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 26: fit-to-viewport, the spiral, species split, and the agent team (2026-10-17, user feedback)
+
+**Feedback:** the view needed scrolling; "why is everything circles" — the real relationships are more complex; and whether the canvas can link with DSH's 智能体团队. A mid-turn follow-up added: agents and tools must look like different species.
+
+**Changes:**
+- **Fit-to-viewport**: the 980×800 plane is measured (`ResizeObserver`) and scaled by `fitScale` (pure, clamped to 0.35–1) so the web always fits without scrolling — verified live at `scale(0.90375)` on the user's window.
+- **The spiral**: `layoutActivity` now lays tools along a spider-web spiral in execution order — each step turns further and drifts outward, and a turn boundary adds an angular gap plus a radial lift. Live radii ran 240→544 with visible turn steps; the shape reads as a process, not a ring.
+- **Species split**: agents are people — a 34px robot with a dashed aura and a role line (子代理 / 团队成员 / 团队主管); tools are equipment — an 18px robot on a pedestal plate. The visual grammar is now "who is working" vs "what they work with".
+- **Agent team linkage**: the controller reads the session's `agentTeam` projection (members + shared task board, verified against `packages/experimental/agent-team`), merges members into the web (teammates get live windows like subagents; a member whose window cannot open still appears from the projection), renders the shared task board in the root card (团队任务 N/M with status glyphs), and the header counts the team. The root keeps its session title; teammates use their team names.
+
+**Evidence (real session):** plane scaled, spiral radii strictly increasing with turn steps, all tool robots pedestal-mounted with family variants, header 「团队 1 人」 matching the app's team popover; 0 pageerrors (`v2-swarm.png`).
+
+**Numbers:** 18 files / **287 tests** green; bundle 163.09 kB / gzip 40.46 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔

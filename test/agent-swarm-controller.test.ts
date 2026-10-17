@@ -230,3 +230,47 @@ describe('todos in the swarm', () => {
     controller.dispose()
   })
 })
+
+describe('agent team linkage', () => {
+  it('merges team members with roles and opens their windows', async () => {
+    const fake = makeDeps({
+      windows: { root: [] },
+      summaries: [{ id: 'root', title: '主会话', running: false }],
+    })
+    const deps: AgentSwarmDeps = {
+      ...fake.deps,
+      teamOf: id => id === 'root' ? {
+        members: [
+          { id: 'root', name: 'lead', role: 'lead', phase: 'active' },
+          { id: 'mate', name: '前端', role: 'teammate', phase: 'running' },
+        ],
+        tasks: [{ id: 't1', subject: '搭好页面框架', status: 'in_progress', ownerName: '前端' }],
+      } : null,
+    }
+    const controller = createAgentSwarmController(deps, 'root')
+    await flush()
+    const state = controller.state()
+    expect(state.team?.members).toHaveLength(2)
+    expect(state.team?.tasks[0]?.subject).toBe('搭好页面框架')
+    const mate = state.agents.find(agent => agent.id === 'mate')
+    expect(mate).toMatchObject({ label: '前端', role: 'teammate', status: 'running' })
+    expect(fake.handles.has('mate')).toBe(true)
+    controller.dispose()
+  })
+
+  it('a member whose window refuses to open still appears from the projection', async () => {
+    const fake = makeDeps({ openFails: ['mate'] })
+    const deps: AgentSwarmDeps = {
+      ...fake.deps,
+      teamOf: () => ({
+        members: [{ id: 'mate', name: '后端', role: 'teammate', phase: 'failed' }],
+        tasks: [],
+      }),
+    }
+    const controller = createAgentSwarmController(deps, 'root')
+    await flush()
+    const mate = controller.state().agents.find(agent => agent.id === 'mate')
+    expect(mate).toMatchObject({ label: '后端', role: 'teammate', status: 'failed' })
+    controller.dispose()
+  })
+})

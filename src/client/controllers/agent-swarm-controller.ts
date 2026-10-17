@@ -14,12 +14,36 @@ import { inheritedPrefixLength, type SessionEventLike } from '../compare/branch-
 import { liveTailFromEntries, tailSnippet, type LiveTail, type TailSnippet } from '../live/live-tail.ts'
 import type { LiveWindowLike } from './graph-controller.ts'
 
+/** One team member as the projection publishes it. */
+export interface TeamMemberLike {
+  readonly id: string
+  readonly name: string
+  readonly role: 'lead' | 'teammate'
+  readonly phase: string
+}
+
+/** One shared task as the projection publishes it. */
+export interface TeamTaskLike {
+  readonly id: string
+  readonly subject: string
+  readonly status: string
+  readonly ownerName?: string
+}
+
+/** The DSH agent team rooted at the inspected session, when one exists. */
+export interface TeamLike {
+  readonly members: readonly TeamMemberLike[]
+  readonly tasks: readonly TeamTaskLike[]
+}
+
 /** What the swarm needs from the host, structural so tests need no DSH. */
 export interface AgentSwarmDeps {
   /** Live event window over one session — the same adapter the canvas uses. */
   liveWindow(sessionId: string): Promise<LiveWindowLike>
   /** Current session rows, for titles and coarse running flags. */
   listSummaries(): readonly { id: string; title?: string; running: boolean }[]
+  /** The session's agent team (members + shared tasks), from the projection. */
+  teamOf?(sessionId: string): TeamLike | null
 }
 
 /** One agent chip on the web. */
@@ -27,11 +51,13 @@ export interface AgentSwarmAgent {
   readonly id: string
   readonly label: string
   readonly depth: number
-  readonly status: 'streaming' | 'running' | 'idle'
+  readonly status: 'streaming' | 'running' | 'idle' | 'failed'
   /** What the agent is emitting right now, when anything is. */
   readonly snippet: TailSnippet | null
   /** The raw tail, for the detail side panel of the swarm view. */
   readonly tail: LiveTail | null
+  /** Team role, when this agent is a member of the session's agent team. */
+  readonly role?: 'lead' | 'teammate'
 }
 
 export interface AgentSwarmState {
@@ -47,6 +73,8 @@ export interface AgentSwarmState {
   readonly toolLayout: ReturnType<typeof layoutActivity>
   /** Each node's current todo list (root and agents), when it has written one. */
   readonly todos: ReadonlyMap<string, readonly SwarmTodo[]>
+  /** The session's agent team, when one exists (members + shared tasks). */
+  readonly team: TeamLike | null
   /**
    * Last activity per node id (agents and `tool:<callId>` entries — each
    * incoming edge's heat). The view feeds these into `pulseProgress` at each
@@ -92,6 +120,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
   let edges: readonly { from: string; to: string }[] = []
   let activity: SessionActivity = activityFromEntries([])
   let toolLayout = layoutActivity([])
+  let team: TeamLike | null = null
   let disposed = false
 
   const notify = (): void => {
@@ -152,13 +181,18 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
   }
 
   const rebuild = (): void => {
+    team = deps.teamOf?.(rootId) ?? null
     const windowsSnapshot = [...knownWindows].map(([sessionId, entries]) => ({ sessionId, entries }))
     nodes = agentsFromWindows(windowsSnapshot, rootId)
     layout = layoutSwarm(nodes, rootId)
     edges = swarmEdges(nodes, rootId)
     // New agents get a window; a vanished window (cannot happen for append-only
-    // catalogs, but stay safe) loses its own.
+    // catalogs, but stay safe) loses its own. Team teammates are sessions too —
+    // opening their windows is what makes the team live on the web.
     for (const node of nodes) openWindow(node.id)
+    for (const member of team?.members ?? []) {
+      if (member.id !== rootId) openWindow(member.id)
+    }
     for (const id of [...windows.keys()]) {
       if (id !== rootId && !nodes.some(node => node.id === id)) closeWindow(id)
     }
@@ -177,10 +211,16 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
   const state = (): AgentSwarmState => {
     const rows = new Map(deps.listSummaries().map(row => [row.id, row]))
     const nodeById = new Map(nodes.map(node => [node.id, node]))
+    const memberById = new Map((team?.members ?? []).map(member => [member.id, member]))
     const labelOf = (id: string): string =>
-      nodeById.get(id)?.label
-        ?? rows.get(id)?.title
-        ?? (id === rootId ? '本会话' : `agent ${shortId(id)}`)
+      // The root keeps its session title; a teammate's team name beats the
+      // generic session title the list gives it.
+      id === rootId
+        ? rows.get(id)?.title ?? memberById.get(id)?.name ?? '本会话'
+        : memberById.get(id)?.name
+          ?? nodeById.get(id)?.label
+          ?? rows.get(id)?.title
+          ?? `agent ${shortId(id)}`
 
     const seen = new Set<string>()
     const agents: AgentSwarmAgent[] = []
@@ -188,9 +228,11 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
       if (id === rootId || seen.has(id)) continue
       seen.add(id)
       const tail = tails.get(id) ?? null
+      const member = memberById.get(id)
       const status: AgentSwarmAgent['status'] = tail !== null
         ? 'streaming'
-        : rows.get(id)?.running === true ? 'running' : 'idle'
+        : member?.phase === 'failed' ? 'failed'
+          : rows.get(id)?.running === true || member?.phase === 'running' ? 'running' : 'idle'
       agents.push({
         id,
         label: labelOf(id),
@@ -198,6 +240,22 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
         status,
         snippet: tail === null ? null : tailSnippet(tail, 46),
         tail,
+        ...(member === undefined ? {} : { role: member.role }),
+      })
+    }
+    // Team members whose window could not be opened still belong on the web —
+    // the projection knows them even when their session is not readable.
+    for (const member of team?.members ?? []) {
+      if (member.id === rootId || seen.has(member.id)) continue
+      seen.add(member.id)
+      agents.push({
+        id: member.id,
+        label: member.name,
+        depth: 1,
+        status: member.phase === 'failed' ? 'failed' : member.phase === 'running' ? 'running' : 'idle',
+        snippet: null,
+        tail: null,
+        role: member.role,
       })
     }
     return {
@@ -213,6 +271,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
       activity,
       toolLayout,
       todos: new Map(todos),
+      team,
       heat: new Map(heat),
     }
   }

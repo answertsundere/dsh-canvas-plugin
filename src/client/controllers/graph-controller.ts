@@ -329,6 +329,44 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
         ...(summary.title === undefined ? {} : { title: summary.title }),
         running: summary.running,
       })),
+      // The agent team rides the session list's projections: `agentTeam` is
+      // the durable roster + task board of the Team rooted at that session.
+      teamOf: sessionId => {
+        const snapshot = deps.listSnapshot()
+        if (snapshot === null || typeof snapshot !== 'object') return null
+        const projections = (snapshot as { projectionsBySession?: unknown }).projectionsBySession
+        if (projections === null || typeof projections !== 'object') return null
+        const entry = (projections as Record<string, unknown>)[sessionId]
+        if (entry === null || typeof entry !== 'object') return null
+        const values = (entry as { values?: unknown }).values
+        if (values === null || typeof values !== 'object') return null
+        const team = (values as Record<string, unknown>)['agentTeam']
+        if (team === null || typeof team !== 'object') return null
+        const record = team as { members?: unknown; tasks?: unknown }
+        if (!Array.isArray(record.members)) return null
+        return {
+          members: record.members.flatMap(member => {
+            if (member === null || typeof member !== 'object') return []
+            const row = member as Record<string, unknown>
+            if (typeof row['id'] !== 'string' || typeof row['name'] !== 'string') return []
+            const role = row['role'] === 'lead' ? 'lead' as const : 'teammate' as const
+            return [{ id: row['id'], name: row['name'], role, phase: typeof row['phase'] === 'string' ? row['phase'] : 'inactive' }]
+          }),
+          tasks: Array.isArray(record.tasks)
+            ? record.tasks.flatMap(task => {
+                if (task === null || typeof task !== 'object') return []
+                const row = task as Record<string, unknown>
+                if (typeof row['id'] !== 'string' || typeof row['subject'] !== 'string') return []
+                return [{
+                  id: row['id'],
+                  subject: row['subject'],
+                  status: typeof row['status'] === 'string' ? row['status'] : 'pending',
+                  ...(typeof row['ownerName'] === 'string' ? { ownerName: row['ownerName'] } : {}),
+                }]
+              })
+            : [],
+        }
+      },
     }, id),
     forkFromRow,
     openInChat,
