@@ -249,3 +249,40 @@ describe('sweepProgress', () => {
     expect(sweepProgress(0, 6500, opts)).toBeCloseTo(500 / 1500, 5)
   })
 })
+
+import { toolGlyph, turnGroups } from '../src/client/swarm/swarm-model.ts'
+
+describe('toolGlyph', () => {
+  it('maps common tool families to a glyph and a family color', () => {
+    expect(toolGlyph('pwsh').glyph).toBe('▸')
+    expect(toolGlyph('pwsh').color).toBe('#2f9e6f')
+    expect(toolGlyph('read').glyph).toBe('◧')
+    expect(toolGlyph('write').glyph).toBe('✎')
+    expect(toolGlyph('edit').glyph).toBe('✎')
+    expect(toolGlyph('grep').glyph).toBe('⌕')
+    expect(toolGlyph('job_output').glyph).toBe('▤')
+    expect(toolGlyph('todo').glyph).toBe('☑')
+  })
+
+  it('falls back to a generic glyph for unknown tools', () => {
+    expect(toolGlyph('mystery_tool').glyph).toBe('⚙')
+  })
+})
+
+describe('turnGroups', () => {
+  const tool = (turn: number, name: string): { id: string; name: string; status: 'ok'; turn: number } =>
+    ({ id: `${name}${turn}`, name, status: 'ok', turn })
+
+  it('groups consecutive tools of the same turn', () => {
+    const groups = turnGroups([tool(0, 'a'), tool(0, 'b'), tool(1, 'c'), tool(1, 'd'), tool(1, 'e'), tool(2, 'f')])
+    expect(groups.map(g => ({ turn: g.turn, start: g.startIndex, end: g.endIndex }))).toEqual([
+      { turn: 0, start: 0, end: 1 },
+      { turn: 1, start: 2, end: 4 },
+      { turn: 2, start: 5, end: 5 },
+    ])
+  })
+
+  it('returns no groups for no tools', () => {
+    expect(turnGroups([])).toEqual([])
+  })
+})

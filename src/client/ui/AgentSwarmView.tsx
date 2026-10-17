@@ -1,6 +1,12 @@
 import { useEffect, useState, type CSSProperties, type FC } from 'react'
 import type { AgentSwarmState } from '../controllers/agent-swarm-controller.ts'
-import { pulseProgress, sweepProgress, type SwarmTodo } from '../swarm/swarm-model.ts'
+import {
+  pulseProgress,
+  sweepProgress,
+  toolGlyph,
+  turnGroups,
+  type SwarmTodo,
+} from '../swarm/swarm-model.ts'
 import { theme } from '../theme.ts'
 
 export interface AgentSwarmViewProps {
@@ -13,12 +19,16 @@ export interface AgentSwarmViewProps {
   readonly nowMs?: number
 }
 
-const VIEW = { width: 960, height: 660 }
+// Must fit the layout radii the controller produces: agents at 230, tools at
+// 340, plus the turn arcs and labels outside the tool ring.
+const VIEW = { width: 980, height: 800 }
+const RING = 230
+const TOOL_RING = 340
 
 const chipStyle = (streaming: boolean): CSSProperties => ({
   position: 'absolute',
   transform: 'translate(-50%, -50%)',
-  maxWidth: 190,
+  maxWidth: 200,
   padding: '6px 10px',
   borderRadius: 10,
   background: theme.card,
@@ -69,12 +79,73 @@ const TodoList: FC<{ readonly items: readonly SwarmTodo[]; readonly limit: numbe
 }
 
 /**
+ * A silk thread: the spoke sags to one side of the straight line, so the web
+ * reads as woven rather than as a sunburst. Deterministic per endpoint pair.
+ */
+function silkPath(from: { x: number; y: number }, to: { x: number; y: number }, index: number): string {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const length = Math.hypot(dx, dy) || 1
+  const sag = Math.min(46, length * 0.14) * (index % 2 === 0 ? 1 : -1)
+  const cx = (from.x + to.x) / 2 + (-dy / length) * sag
+  const cy = (from.y + to.y) / 2 + (dx / length) * sag
+  return `M ${from.x} ${from.y} Q ${cx} ${cy} ${to.x} ${to.y}`
+}
+
+/** Point at `t` along the same quadratic the silk draws. */
+function silkPoint(from: { x: number; y: number }, to: { x: number; y: number }, index: number, t: number): { x: number; y: number } {
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const length = Math.hypot(dx, dy) || 1
+  const sag = Math.min(46, length * 0.14) * (index % 2 === 0 ? 1 : -1)
+  const cx = (from.x + to.x) / 2 + (-dy / length) * sag
+  const cy = (from.y + to.y) / 2 + (dx / length) * sag
+  const u = 1 - t
+  return {
+    x: u * u * from.x + 2 * u * t * cx + t * t * to.x,
+    y: u * u * from.y + 2 * u * t * cy + t * t * to.y,
+  }
+}
+
+/** A comet: the bright head plus two fading tail dots. */
+const Comet: FC<{
+  readonly from: { x: number; y: number }
+  readonly to: { x: number; y: number }
+  readonly index: number
+  readonly progress: number
+  readonly attr: string
+  readonly label: string
+}> = ({ from, to, index, progress, attr, label }) => (
+  <>
+    {[0, 0.05, 0.1].map((lag, lagIndex) => {
+      const t = Math.max(0, progress - lag)
+      const point = silkPoint(from, to, index, t)
+      const head = lagIndex === 0
+      return (
+        <circle
+          key={lag}
+          {...{ [attr]: head ? label : undefined }}
+          data-swarm-pulse-tail={head ? undefined : label}
+          cx={point.x}
+          cy={point.y}
+          r={head ? 4 : 3 - lagIndex * 0.6}
+          fill={theme.accent}
+          opacity={head ? 1 : 0.5 - lagIndex * 0.15}
+        />
+      )
+    })}
+  </>
+)
+
+/**
  * The 「Agent 实况」 overlay: one session's agent web.
  *
- * The root sits at the center, its subagents on the ring around it, theirs on
- * smaller rings. Activity is the spider part: while an agent emits, a glowing
- * dot crawls along its spoke toward the parent, and the edge itself glows;
- * after the stream stops the dot crawls home once and the edge goes dark.
+ * Structure: concentric silk rings, the root at the center, its subagents on
+ * the inner ring, the session's own tool history on the outer ring grouped by
+ * turn (each group's span marked on the rim). Motion: while an agent or tool
+ * is hot, a comet crawls its silk toward the parent; when nothing is hot, a
+ * dim sweep walks every thread in work order, on repeat — the web is never
+ * still, and the sweep reads as the order the work actually ran in.
  */
 export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs }) => {
   const [tick, setTick] = useState(() => Date.now())
@@ -88,7 +159,16 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
   const positionOf = (id: string): { x: number; y: number } => swarm.layout.positions.get(id) ?? { x: 0, y: 0 }
   const toolPositionOf = (id: string): { x: number; y: number } => swarm.toolLayout.positions.get(id) ?? { x: 0, y: 0 }
   const agents = swarm.agents
-  const pendingTool = swarm.activity.tools.find(tool => tool.id === swarm.activity.pendingToolId) ?? null
+  const tools = swarm.activity.tools
+  const pendingTool = tools.find(tool => tool.id === swarm.activity.pendingToolId) ?? null
+  const groups = turnGroups(tools)
+  const rootTodos = swarm.todos.get(swarm.rootId)
+  const rootHeat = swarm.heat.get(swarm.rootId)
+  const rootHot = rootHeat !== undefined && pulseProgress(rootHeat, now) !== null
+
+  const angleOf = (index: number): number => -Math.PI / 2 + (2 * Math.PI * index) / Math.max(tools.length, 1)
+  const polar = (angle: number, radius: number): { x: number; y: number } =>
+    ({ x: radius * Math.cos(angle), y: radius * Math.sin(angle) })
 
   return (
     <div
@@ -109,7 +189,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
         <span style={{ fontWeight: 600 }}>Agent 实况</span>
         <span style={{ color: theme.muted }}>{swarm.rootLabel}</span>
         <span style={{ color: theme.muted }}>
-          {swarm.agents.length} 个 agent · 近 {swarm.activity.turnCount + (swarm.activity.openTurn ? 1 : 0)} 轮
+          {agents.length} 个 agent · 近 {swarm.activity.turnCount + (swarm.activity.openTurn ? 1 : 0)} 轮
           {swarm.activity.openTurn ? '（进行中）' : ''}
           {pendingTool !== null ? ` · 正在 ${pendingTool.name}` : ''}
         </span>
@@ -142,39 +222,78 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
             style={{ position: 'absolute', inset: 0 }}
           >
             <g transform={`translate(${VIEW.width / 2}, ${VIEW.height / 2})`}>
+              {/* Silk texture: concentric rings under everything. */}
+              {[RING * 0.55, RING, TOOL_RING, TOOL_RING + 70].map(radius => (
+                <circle
+                  key={radius}
+                  data-swarm-guide={Math.round(radius)}
+                  cx={0} cy={0} r={radius}
+                  fill="none"
+                  stroke={theme.border}
+                  strokeWidth={1}
+                  opacity={radius === RING || radius === TOOL_RING ? 0.55 : 0.25}
+                />
+              ))}
+
+              {/* Turn spans on the rim: where one turn's work begins and ends. */}
+              {tools.length > 1 && groups.map(group => {
+                if (group.endIndex <= group.startIndex) return null
+                const startAngle = angleOf(group.startIndex)
+                const endAngle = angleOf(group.endIndex)
+                const start = polar(startAngle, TOOL_RING + 26)
+                const end = polar(endAngle, TOOL_RING + 26)
+                const mid = polar((startAngle + endAngle) / 2, TOOL_RING + 52)
+                return (
+                  <g key={`turn-${group.turn}`}>
+                    <path
+                      data-swarm-turn-arc={group.turn}
+                      d={`M ${start.x} ${start.y} A ${TOOL_RING + 26} ${TOOL_RING + 26} 0 0 1 ${end.x} ${end.y}`}
+                      fill="none"
+                      stroke={theme.accent}
+                      strokeWidth={1}
+                      opacity={0.35}
+                    />
+                    <text
+                      data-swarm-turn-label={group.turn}
+                      x={mid.x}
+                      y={mid.y}
+                      fill={theme.muted}
+                      fontSize={10}
+                      textAnchor="middle"
+                    >
+                      第 {group.turn + 1} 轮
+                    </text>
+                  </g>
+                )
+              })}
+
               {swarm.edges.map((edge, edgeIndex) => {
                 const from = positionOf(edge.from)
                 const to = positionOf(edge.to)
                 const heatAt = swarm.heat.get(edge.to)
                 const progress = heatAt === undefined ? null : pulseProgress(heatAt, now)
-                // Cold edges still breathe: the ambient sweep walks the whole
-                // web in order (tools first, then agents), on repeat.
                 const sweep = progress === null
-                  ? sweepProgress(swarm.activity.tools.length + edgeIndex, now)
+                  ? sweepProgress(tools.length + edgeIndex, now)
                   : null
+                const silk = silkPath(from, to, tools.length + edgeIndex)
                 return (
                   <g key={`${edge.from}->${edge.to}`}>
-                    <line
+                    <path
                       data-swarm-edge={`${edge.from}->${edge.to}`}
-                      x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+                      d={silk}
+                      fill="none"
                       stroke={progress === null ? theme.border : theme.accent}
                       strokeWidth={progress === null ? 1.2 : 1.8}
                       opacity={progress === null ? 0.9 : 1}
                     />
                     {progress !== null && (
-                      <circle
-                        data-swarm-pulse={`${edge.from}->${edge.to}`}
-                        cx={to.x + (from.x - to.x) * progress}
-                        cy={to.y + (from.y - to.y) * progress}
-                        r={4}
-                        fill={theme.accent}
-                      />
+                      <Comet from={from} to={to} index={tools.length + edgeIndex} progress={progress} attr="data-swarm-pulse" label={`${edge.from}->${edge.to}`} />
                     )}
                     {sweep !== null && (
                       <circle
                         data-swarm-sweep={`${edge.from}->${edge.to}`}
-                        cx={to.x + (from.x - to.x) * sweep}
-                        cy={to.y + (from.y - to.y) * sweep}
+                        cx={silkPoint(from, to, tools.length + edgeIndex, sweep).x}
+                        cy={silkPoint(from, to, tools.length + edgeIndex, sweep).y}
                         r={3}
                         fill={theme.accent}
                         opacity={0.55}
@@ -183,35 +302,30 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                   </g>
                 )
               })}
-              {swarm.activity.tools.map((tool, toolIndex) => {
+              {tools.map((tool, toolIndex) => {
                 const to = toolPositionOf(tool.id)
                 const heatAt = swarm.heat.get(`tool:${tool.id}`)
                 const progress = heatAt === undefined ? null : pulseProgress(heatAt, now)
                 const sweep = progress === null ? sweepProgress(toolIndex, now) : null
                 return (
                   <g key={`tool->${tool.id}`}>
-                    <line
+                    <path
                       data-swarm-tool-edge={tool.id}
-                      x1={0} y1={0} x2={to.x} y2={to.y}
+                      d={silkPath({ x: 0, y: 0 }, to, toolIndex)}
+                      fill="none"
                       stroke={progress === null ? theme.border : theme.accent}
                       strokeWidth={progress === null ? 1 : 1.6}
                       strokeDasharray={tool.status === 'pending' ? undefined : '3 4'}
                       opacity={progress === null ? 0.7 : 1}
                     />
                     {progress !== null && (
-                      <circle
-                        data-swarm-pulse={`tool:${tool.id}`}
-                        cx={to.x + (0 - to.x) * progress}
-                        cy={to.y + (0 - to.y) * progress}
-                        r={4}
-                        fill={theme.accent}
-                      />
+                      <Comet from={{ x: 0, y: 0 }} to={to} index={toolIndex} progress={progress} attr="data-swarm-pulse" label={`tool:${tool.id}`} />
                     )}
                     {sweep !== null && (
                       <circle
                         data-swarm-sweep={`tool:${tool.id}`}
-                        cx={to.x + (0 - to.x) * sweep}
-                        cy={to.y + (0 - to.y) * sweep}
+                        cx={silkPoint({ x: 0, y: 0 }, to, toolIndex, sweep).x}
+                        cy={silkPoint({ x: 0, y: 0 }, to, toolIndex, sweep).y}
                         r={3}
                         fill={theme.accent}
                         opacity={0.55}
@@ -254,9 +368,11 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
             )
           })}
 
-          {swarm.activity.tools.map(tool => {
+          {tools.map(tool => {
             const p = toolPositionOf(tool.id)
             const pending = tool.status === 'pending'
+            const failed = tool.status === 'error'
+            const visual = toolGlyph(tool.name)
             return (
               <div
                 key={tool.id}
@@ -267,22 +383,25 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                   transform: 'translate(-50%, -50%)',
                   left: VIEW.width / 2 + p.x,
                   top: VIEW.height / 2 + p.y,
-                  maxWidth: 170,
-                  padding: '3px 9px',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  maxWidth: 180,
+                  padding: '4px 10px 4px 8px',
                   borderRadius: 8,
                   background: theme.card,
-                  border: `1px solid ${pending ? theme.accent : tool.status === 'error' ? '#e0554d' : theme.border}`,
+                  border: `1px solid ${pending ? theme.accent : failed ? '#e0554d' : theme.border}`,
+                  borderLeft: `3px solid ${failed ? '#e0554d' : visual.color}`,
                   boxShadow: pending ? `0 0 12px ${theme.accent}55` : 'none',
-                  color: pending ? theme.text : theme.muted,
+                  color: pending ? theme.text : failed ? '#e0554d' : theme.muted,
                   font: '11px/1.4 system-ui, sans-serif',
                   whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
                   userSelect: 'none',
                 }}
               >
-                {pending ? '⚙ ' : tool.status === 'error' ? '✗ ' : '✓ '}
-                {tool.name}
+                <span style={{ color: failed ? '#e0554d' : visual.color, flex: '0 0 auto' }}>{visual.glyph}</span>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tool.name}</span>
+                <span style={{ flex: '0 0 auto', color: failed ? '#e0554d' : theme.muted }}>
+                  {pending ? '…' : failed ? '✗' : '✓'}
+                </span>
               </div>
             )
           })}
@@ -291,31 +410,39 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
             data-swarm-agent={swarm.rootId}
             data-swarm-root-agent="true"
             style={{
-              ...chipStyle(swarm.heat.get(swarm.rootId) !== undefined
-                && pulseProgress(swarm.heat.get(swarm.rootId) as number, now) !== null),
+              position: 'absolute',
+              transform: 'translate(-50%, -50%)',
               left: VIEW.width / 2,
               top: VIEW.height / 2,
-              borderWidth: 1.5,
+              maxWidth: 280,
+              padding: '10px 14px',
+              borderRadius: 12,
+              background: theme.cardActive,
+              border: `1.5px solid ${rootHot ? theme.accent : theme.border}`,
+              boxShadow: rootHot ? `0 0 16px ${theme.accent}66` : 'none',
+              color: theme.text,
+              font: '12px/1.5 system-ui, sans-serif',
+              userSelect: 'none',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 4, background: theme.text, flex: '0 0 auto' }} />
-              <span style={{ fontWeight: 700 }}>{swarm.rootLabel}</span>
+              <span style={{ width: 10, height: 10, borderRadius: 5, background: theme.text, flex: '0 0 auto' }} />
+              <span style={{ fontWeight: 700, fontSize: 13 }}>{swarm.rootLabel}</span>
+            </div>
+            <div style={{ color: theme.muted, marginTop: 2 }}>
+              {agents.length} 个 agent · {tools.length} 个工具
             </div>
             {swarm.rootSnippet !== null && (
               <div
                 data-swarm-snippet
-                style={{ color: theme.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}
+                style={{ color: theme.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 240 }}
               >
                 <span style={{ color: swarm.rootSnippet.label === '工具' ? theme.accent : theme.muted }}>{swarm.rootSnippet.label}</span>
                 {' '}
                 {swarm.rootSnippet.text}
               </div>
             )}
-            {(() => {
-              const rootTodos = swarm.todos.get(swarm.rootId)
-              return rootTodos === undefined ? null : <TodoList items={rootTodos} limit={7} />
-            })()}
+            {rootTodos === undefined ? null : <TodoList items={rootTodos} limit={7} />}
           </div>
         </div>
       </div>

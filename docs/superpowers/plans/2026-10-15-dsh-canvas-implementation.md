@@ -933,6 +933,21 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 23: the swarm view, second pass — texture, identity, structure (2026-10-17, user feedback: "太简陋")
+
+**Design pass:** the first working version was functionally complete but visually flat — gray pills on straight lines. The upgrade package, chosen for readability and zero runtime cost (no physics, no 3D):
+- **Silk texture**: concentric guide rings under the web; spokes are now quadratic silk threads that sag to alternating sides, so the web reads as woven, not as a sunburst.
+- **Comet pulses**: a hot thread draws a bright head plus two fading tail dots travelling the same curve; the single-dot version is gone. Sweep dots ride the same curves.
+- **Tool identity**: `toolGlyph` (pure) maps tool families to a glyph + family color (▸ shell, ▤ job, ◧ read, ✎ write/edit, ⌕ grep/search, ☑ todo, ☍ fetch) — every tool card gets a colored left bar, the glyph, and a state mark (… pending / ✓ ok / ✗ error in red).
+- **Turn structure**: `turnGroups` (pure) groups consecutive same-turn tools; the rim draws a faint arc per multi-tool turn with a 第 N 轮 label — the ring now shows WHERE each turn's work sits, which the mockup's flow arrows communicated.
+- **Root card**: a real identity card (title, agent/tool counts, live snippet, todo checklist) instead of a one-line chip. The view grew to 980×800 so the 340-radius tool ring, its arcs, and labels all fit without clipping.
+
+**Evidence:** live on the real session — concentric rings, family-colored cards (including two red ✗ job_output), turn labels 第 29/30 轮, five sweep comets mid-flight and moving (`sweep-live.png`); 0 pageerrors.
+
+**Numbers:** 18 files / **272 tests** green; bundle 135.39 kB / gzip 35.46 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔

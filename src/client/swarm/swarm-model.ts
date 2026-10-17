@@ -340,3 +340,53 @@ export function sweepProgress(
   if (t < 0 || t > travel) return null
   return t / travel
 }
+
+/** Visual identity of one tool family: a text glyph and its color. */
+export interface ToolVisual {
+  readonly glyph: string
+  readonly color: string
+}
+
+const TOOL_VISUALS: readonly { readonly pattern: RegExp; readonly visual: ToolVisual }[] = [
+  { pattern: /^(pwsh|powershell|shell|bash|cmd|terminal|subprocess)/i, visual: { glyph: '▸', color: '#2f9e6f' } },
+  { pattern: /^job_/i, visual: { glyph: '▤', color: '#2f9e6f' } },
+  { pattern: /^(read|cat|view|open|ls|list)/i, visual: { glyph: '◧', color: '#4aa3df' } },
+  { pattern: /^(write|edit|create|patch|apply)/i, visual: { glyph: '✎', color: '#8a7dff' } },
+  { pattern: /^(grep|search|find|query)/i, visual: { glyph: '⌕', color: '#d98a2b' } },
+  { pattern: /^(todo|task|plan)/i, visual: { glyph: '☑', color: '#2f9e6f' } },
+  { pattern: /^(fetch|web|http|curl)/i, visual: { glyph: '☍', color: '#4aa3df' } },
+]
+
+const GENERIC_TOOL: ToolVisual = { glyph: '⚙', color: '#9aa4b2' }
+
+/** The tool's family glyph and color — one home for the mapping the view draws. */
+export function toolGlyph(name: string): ToolVisual {
+  for (const { pattern, visual } of TOOL_VISUALS) {
+    if (pattern.test(name)) return visual
+  }
+  return GENERIC_TOOL
+}
+
+/** One run of consecutive tools belonging to the same turn. */
+export interface TurnGroup {
+  readonly turn: number
+  readonly startIndex: number
+  readonly endIndex: number
+}
+
+/**
+ * Consecutive same-turn tools as groups, so the ring can mark where each turn
+ * begins and ends. Tools arrive in log order, so a turn's work is contiguous.
+ */
+export function turnGroups(tools: readonly ActivityTool[]): TurnGroup[] {
+  const groups: TurnGroup[] = []
+  tools.forEach((tool, index) => {
+    const last = groups[groups.length - 1]
+    if (last !== undefined && last.turn === tool.turn) {
+      groups[groups.length - 1] = { turn: last.turn, startIndex: last.startIndex, endIndex: index }
+    } else {
+      groups.push({ turn: tool.turn, startIndex: index, endIndex: index })
+    }
+  })
+  return groups
+}
