@@ -1016,6 +1016,20 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 29: deep-optimization rounds 4–10 (2026-10-17, continuing the pass)
+
+- **Round 4**: consecutive same-name tools collapse into one ring chip with a ×N badge (`collapseTools`, pure — consecutive only, representative is the newest of the run, status change breaks the run); an in-progress shared task draws a dashed amber assignment thread from the lead to its owner robot; the main canvas grows a **corner minimap** (status dots, viewport frame, click-to-recenter, dot-click selects the node).
+- **Round 5**: Escape closes the swarm; the palette choice persists via localStorage (storage failures degrade to session-only); the conclusion block gains a 复制 button (clipboard write + 已复制 feedback, absent when there is nothing to copy).
+- **Round 6**: a failed tool card carries the result's error message as a tooltip (`ActivityTool.error` folded from `tool/result.error.message`); node cards carry their full title as a tooltip; the swarm's animation tick pauses while the document is hidden.
+- **Round 7**: clicking a teammate robot jumps the main canvas to that session (chips are inert without the callback); clicking a minimap dot selects the node without recentering.
+- **Round 8**: the swarm header counts failures in red; double-clicking the root opens the session in the conversation.
+- **Round 9**: failed tools float to the front of the tool ring.
+- **Round 10**: an empty workspace explains itself — 当前工作区还没有会话, and a note that archived sessions never appear.
+
+**Numbers:** 18 files / **325 tests** green; bundle ~178 kB / gzip ~43 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔

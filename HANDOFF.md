@@ -13,9 +13,9 @@
 
 | 维度 | 状态 |
 |---|---|
-| 计划任务 | 27/27+ 完成（…27 缩放/归档/调色板/设备化、**28 深度优化 R1-R3：成员上环修复/团队名/拖拽阈值/锚定缩放/自动适配/工具参数预览/任务负责人高亮**；持续迭代中） |
-| 测试 | **18 文件 / 304 测试全绿**（`vitest run`） |
-| 构建 | typecheck 干净；`lib/client.js` 172.47 kB / gzip 42.84 kB，lazy-CJS banner 完好 |
+| 计划任务 | 29/29+ 完成（…28 深度优化 R1-R3、**29 R4-R10：工具折叠 ×N/指派连线/小地图/Esc/调色板持久化/复制结论/错误 tooltip/全名 tooltip/后台暂停/机器人跳转/失败前置/空态说明**；持续迭代中） |
+| 测试 | **18 文件 / 325 测试全绿**（`vitest run`） |
+| 构建 | typecheck 干净；`lib/client.js` ~178 kB / gzip ~43 kB，lazy-CJS banner 完好 |
 | 安装 | **两个 profile 都已装**（Task 17 后已重装）：`web-0.1.7` 与 `desktop` 副本与 `lib/client.js` **逐字节一致**，`m0-check` 均 11/11 |
 | M0 关卡 | 1 **PASS（DOM，含卸载往返）**；2/5/6/7/12 UNIT（2 另有真实数据证据）；4 UNIT+SRC；9 UNIT（flap 语义）；10 **PASS（500 节点实测）**；3 UNIT；**8 PASS（真实观察：两子分支并行 running=2 + 实时流片段）**；11 PARTIAL（retainInfo 残留未实测，dispose 释放窗口已有单测） |
 | 发布 | **阻塞**：npm 包名 `dsh-canvas` 被占用，需 `@<scope>/dsh-canvas`（见 §7 决策点） |
