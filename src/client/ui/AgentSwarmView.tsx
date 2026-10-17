@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties, type FC } from 'react'
 import type { AgentSwarmState } from '../controllers/agent-swarm-controller.ts'
-import { pulseProgress, type SwarmTodo } from '../swarm/swarm-model.ts'
+import { pulseProgress, sweepProgress, type SwarmTodo } from '../swarm/swarm-model.ts'
 import { theme } from '../theme.ts'
 
 export interface AgentSwarmViewProps {
@@ -142,11 +142,16 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
             style={{ position: 'absolute', inset: 0 }}
           >
             <g transform={`translate(${VIEW.width / 2}, ${VIEW.height / 2})`}>
-              {swarm.edges.map(edge => {
+              {swarm.edges.map((edge, edgeIndex) => {
                 const from = positionOf(edge.from)
                 const to = positionOf(edge.to)
                 const heatAt = swarm.heat.get(edge.to)
                 const progress = heatAt === undefined ? null : pulseProgress(heatAt, now)
+                // Cold edges still breathe: the ambient sweep walks the whole
+                // web in order (tools first, then agents), on repeat.
+                const sweep = progress === null
+                  ? sweepProgress(swarm.activity.tools.length + edgeIndex, now)
+                  : null
                 return (
                   <g key={`${edge.from}->${edge.to}`}>
                     <line
@@ -165,13 +170,24 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                         fill={theme.accent}
                       />
                     )}
+                    {sweep !== null && (
+                      <circle
+                        data-swarm-sweep={`${edge.from}->${edge.to}`}
+                        cx={to.x + (from.x - to.x) * sweep}
+                        cy={to.y + (from.y - to.y) * sweep}
+                        r={3}
+                        fill={theme.accent}
+                        opacity={0.55}
+                      />
+                    )}
                   </g>
                 )
               })}
-              {swarm.activity.tools.map(tool => {
+              {swarm.activity.tools.map((tool, toolIndex) => {
                 const to = toolPositionOf(tool.id)
                 const heatAt = swarm.heat.get(`tool:${tool.id}`)
                 const progress = heatAt === undefined ? null : pulseProgress(heatAt, now)
+                const sweep = progress === null ? sweepProgress(toolIndex, now) : null
                 return (
                   <g key={`tool->${tool.id}`}>
                     <line
@@ -189,6 +205,16 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                         cy={to.y + (0 - to.y) * progress}
                         r={4}
                         fill={theme.accent}
+                      />
+                    )}
+                    {sweep !== null && (
+                      <circle
+                        data-swarm-sweep={`tool:${tool.id}`}
+                        cx={to.x + (0 - to.x) * sweep}
+                        cy={to.y + (0 - to.y) * sweep}
+                        r={3}
+                        fill={theme.accent}
+                        opacity={0.55}
                       />
                     )}
                   </g>

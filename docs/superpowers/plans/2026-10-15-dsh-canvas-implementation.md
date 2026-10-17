@@ -923,6 +923,16 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 22: ambient sweep — the idle web breathes (2026-10-17, user feedback)
+
+**Feedback:** "为什么现在还是这样的…增加实时的动效" — opening an IDLE session showed a static ring of ✓ chips; motion only existed while something was hot.
+
+**Change:** `sweepProgress` (pure) gives every cold edge a dim pulse in staggered order — tools first, then agents, one lap of the web per 6s period, each edge's dot travelling its spoke over 1.5s. Hot edges keep their brighter pulse; the sweep only fills the cold ones, so an idle session now shows the ORDER its work ran in, on repeat. Verified live on the idle long-task session: 5 staggered dots mid-flight in one sample, moved 1.2s later (`sweep-live.png`), 0 pageerrors.
+
+**Numbers:** 18 files / **268 tests** green; bundle 127.95 kB / gzip 33.58 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔

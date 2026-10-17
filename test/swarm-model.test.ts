@@ -225,3 +225,27 @@ describe('todosFromEntries', () => {
     ])).toBeNull()
   })
 })
+
+import { sweepProgress } from '../src/client/swarm/swarm-model.ts'
+
+describe('sweepProgress', () => {
+  const opts = { period: 6000, step: 300, travel: 1500 }
+  it('a pulse travels each edge in staggered order within a period', () => {
+    // Edge 0 starts at phase 0; edge 1 at 300ms; edge 2 at 600ms.
+    expect(sweepProgress(0, 0, opts)).toBe(0)
+    expect(sweepProgress(1, 300, opts)).toBe(0)
+    expect(sweepProgress(2, 600, opts)).toBe(0)
+    expect(sweepProgress(0, 750, opts)).toBeCloseTo(0.5, 5)
+    expect(sweepProgress(1, 750, opts)).toBeCloseTo(0.3, 5)
+  })
+
+  it('an edge is dark before its slot and after the travel window', () => {
+    expect(sweepProgress(3, 0, opts)).toBeNull() // its slot has not come
+    expect(sweepProgress(0, 1600, opts)).toBeNull() // travelled home
+  })
+
+  it('wraps at the period boundary, so the sweep keeps running', () => {
+    expect(sweepProgress(0, 6000, opts)).toBe(0)
+    expect(sweepProgress(0, 6500, opts)).toBeCloseTo(500 / 1500, 5)
+  })
+})

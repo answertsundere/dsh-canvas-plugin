@@ -137,3 +137,16 @@ describe('AgentSwarmView todo checklist', () => {
     expect(chip?.querySelector('[data-swarm-todos]')?.textContent).toContain('抓取页面')
   })
 })
+
+describe('ambient sweep on cold edges', () => {
+  it('a cold edge carries a sweep dot at its slot; a hot edge carries the bright pulse instead', () => {
+    // Frozen clock: 48750 % 6000 = 750 — sweep slot 0 is mid-travel.
+    render(<AgentSwarmView swarm={activityState()} onClose={() => {}} nowMs={48750} />)
+    // c1 is settled (cold) -> sweep; c2 is pending (hot) -> bright pulse.
+    expect(document.querySelector('[data-swarm-sweep="tool:c1"]')).not.toBeNull()
+    expect(document.querySelector('[data-swarm-pulse="tool:c2"]')).not.toBeNull()
+    expect(document.querySelector('[data-swarm-sweep="tool:c2"]')).toBeNull()
+    // Agent a is hot -> no sweep on its edge either.
+    expect(document.querySelector('[data-swarm-sweep="root->a"]')).toBeNull()
+  })
+})

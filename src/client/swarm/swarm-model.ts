@@ -320,3 +320,23 @@ export function todosFromEntries(entries: readonly LiveEntryLike[]): SwarmTodo[]
   }
   return todos
 }
+
+/**
+ * Ambient sweep: while nothing is hot, history still breathes. Each edge gets
+ * a dim pulse in staggered order — one lap of the web per period — so an idle
+ * session shows the ORDER its tools ran in, on repeat. Hot edges keep their
+ * own brighter pulse; the sweep only fills the cold ones.
+ */
+export function sweepProgress(
+  index: number,
+  now: number,
+  opts: { period?: number; step?: number; travel?: number } = {},
+): number | null {
+  const period = opts.period ?? 6000
+  const step = opts.step ?? 300
+  const travel = opts.travel ?? 1500
+  const phase = ((now % period) + period) % period
+  const t = phase - index * step
+  if (t < 0 || t > travel) return null
+  return t / travel
+}
