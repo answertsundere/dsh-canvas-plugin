@@ -6,13 +6,15 @@ export type RightPanelTab = 'detail' | 'compare'
 export interface RightPanelProps {
   readonly tab: RightPanelTab
   readonly title?: string
+  /** One prominent action next to the title — the Agent 实况 entry lives here. */
+  readonly headerAction?: { readonly label: string; readonly title?: string; onClick(): void }
   onTabChange(tab: RightPanelTab): void
   onClose(): void
   readonly children: ReactNode
 }
 
 /** Sliding right-hand container holding the 详情 and 对比 views. */
-export const RightPanel: FC<RightPanelProps> = ({ tab, title, onTabChange, onClose, children }) => (
+export const RightPanel: FC<RightPanelProps> = ({ tab, title, headerAction, onTabChange, onClose, children }) => (
   <aside
     data-right-panel
     style={{
@@ -51,13 +53,30 @@ export const RightPanel: FC<RightPanelProps> = ({ tab, title, onTabChange, onClo
           {title}
         </span>
       )}
+      {headerAction !== undefined && (
+        <button
+          type="button"
+          data-panel-action
+          title={headerAction.title}
+          onClick={headerAction.onClick}
+          style={{
+            marginLeft: 'auto', background: theme.card, color: theme.accent,
+            border: `1px solid ${theme.accent}66`, borderRadius: 6,
+            padding: '3px 10px', font: 'inherit', cursor: 'pointer',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {headerAction.label}
+        </button>
+      )}
       <button
         type="button"
         data-panel-close
         onClick={onClose}
         aria-label="关闭"
         style={{
-          marginLeft: 'auto', background: 'transparent', color: theme.muted,
+          marginLeft: headerAction === undefined ? 'auto' : 0,
+          background: 'transparent', color: theme.muted,
           border: 'none', font: 'inherit', cursor: 'pointer',
         }}
       >

@@ -882,6 +882,20 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 19: discoverable entry + the breathing halo (2026-10-17, user feedback)
+
+**Feedback:** "如何点击进入一个会话的画布…右侧的分支难道就是吗" — the ⌖ corner button was too hidden (the user read the right panel's branch timeline as "the session canvas"); and running sessions showed 思考中 with no motion — "加一个光晕律动".
+
+**Changes:**
+- The detail panel header gains a prominent `⌖ Agent 实况` action (`RightPanel.headerAction`), wired in `CanvasTab` whenever the model can inspect — the entry now sits where the user is already looking, and the tooltip says what it opens.
+- A working card (status thinking/tool, or a visible stream) breathes: `NodeCard` gains `active`, rendered as a `dshCanvasBreath` CSS animation whose glow color is the status's own color via a per-card `--breath-color` custom property. The canvas has no CSS pipeline, so the keyframes and the ⌖ hover rule ride in as one injected `<style>` sheet from `CanvasTab` — the only real CSS in the plugin, everything else stays inline.
+
+**Evidence:** live — the header action opens the swarm (`halo-swarm-entry.png`: Agent 实况 header, root chip with the real title, 返回画布), CSS injected, all cards idle at probe time so the halo itself is pinned by unit tests (`data-node-active`, animation set for thinking/streaming, absent for idle) awaiting a running session to be seen. The probe's first "ENTRY failed" was the same synchronous-DOM-after-click false negative as Task 18's close probe — React 18 batches the mount; wait before asserting.
+
+**Numbers:** 18 files / **239 tests** green; bundle 110.87 kB / gzip 29.60 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔

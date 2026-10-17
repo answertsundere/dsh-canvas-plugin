@@ -243,3 +243,29 @@ describe('BranchTimeline live output', () => {
     expect(document.querySelector('[data-live-text]')).toBeNull()
   })
 })
+
+describe('RightPanel header action', () => {
+  it('renders the prominent action and fires it', () => {
+    const onAction = vi.fn()
+    render(
+      <RightPanel
+        tab="detail"
+        title="会话"
+        headerAction={{ label: '⌖ Agent 实况', title: '蛛网', onClick: onAction }}
+        onTabChange={() => {}}
+        onClose={() => {}}
+      >
+        <div>body</div>
+      </RightPanel>,
+    )
+    const action = document.querySelector('[data-panel-action]') as HTMLButtonElement
+    expect(action.textContent).toBe('⌖ Agent 实况')
+    fireEvent.click(action)
+    expect(onAction).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders no action when none is given', () => {
+    render(<RightPanel tab="detail" onTabChange={() => {}} onClose={() => {}}><div /></RightPanel>)
+    expect(document.querySelector('[data-panel-action]')).toBeNull()
+  })
+})

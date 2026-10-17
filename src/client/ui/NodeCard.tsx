@@ -1,4 +1,4 @@
-import type { FC, MouseEvent } from 'react'
+import type { FC, CSSProperties, MouseEvent } from 'react'
 import type { CanvasNode } from '../../shared/contracts.ts'
 import type { StatusBadge } from '../../shared/status.ts'
 import type { TailSnippet } from '../live/live-tail.ts'
@@ -19,6 +19,12 @@ export interface NodeCardProps {
   readonly highlight: boolean
   /** The node's in-flight output, when it is streaming. */
   readonly live?: TailSnippet | null
+  /**
+   * The node is working right now (thinking/tool or a visible stream): the
+   * card breathes a halo in the status's own color so a busy session reads
+   * from across the room. The keyframes live in the canvas's injected style.
+   */
+  readonly active?: boolean
   readonly now: number
   onClick(event: MouseEvent<HTMLDivElement>, id: string): void
   /** Opens the session in the conversation view. */
@@ -28,13 +34,14 @@ export interface NodeCardProps {
 }
 
 export const NodeCard: FC<NodeCardProps> = ({
-  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, now, onClick, onOpen, onInspect,
+  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, active = false, now, onClick, onOpen, onInspect,
 }) => (
   <div
     data-canvas-node={node.id}
     data-selected={selected ? 'true' : 'false'}
     data-comparing={comparing ? 'true' : 'false'}
     data-highlight={highlight ? 'true' : 'false'}
+    data-node-active={active ? 'true' : 'false'}
     onClick={event => onClick(event, node.id)}
     onDoubleClick={event => { event.stopPropagation(); onOpen?.(node.id) }}
     style={{
@@ -55,6 +62,12 @@ export const NodeCard: FC<NodeCardProps> = ({
       cursor: 'pointer',
       overflow: 'hidden',
       userSelect: 'none',
+      ...(active
+        ? {
+            animation: 'dshCanvasBreath 1.6s ease-in-out infinite',
+            ['--breath-color' as never]: status.color,
+          } as CSSProperties
+        : {}),
     }}
   >
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -82,7 +95,8 @@ export const NodeCard: FC<NodeCardProps> = ({
       <button
         type="button"
         data-node-inspect={node.id}
-        title="Agent 实况"
+        title="Agent 实况：查看这个会话的 agent 蛛网"
+        className="dsh-canvas-inspect"
         onClick={event => { event.stopPropagation(); onInspect(node.id) }}
         style={{
           position: 'absolute', top: 5, right: 5,

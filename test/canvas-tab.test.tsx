@@ -478,3 +478,38 @@ const swarmStateFake = {
   layout: { positions: new Map(), radius: 230 },
   heat: new Map(),
 }
+
+describe('active-card halo and the prominent swarm entry', () => {
+  it('a thinking or streaming card breathes; an idle card does not', () => {
+    render(<CanvasTab canvas={model({
+      statusOf: id => badge(id === 'b' ? 'thinking' : 'idle'),
+      tailOf: () => null,
+    })} />)
+    const busy = document.querySelector('[data-canvas-node="b"]') as HTMLElement
+    const idle = document.querySelector('[data-canvas-node="a"]') as HTMLElement
+    expect(busy.getAttribute('data-node-active')).toBe('true')
+    expect(busy.style.animation).toContain('dshCanvasBreath')
+    expect(idle.getAttribute('data-node-active')).toBe('false')
+    expect(idle.style.animation).toBe('')
+  })
+
+  it('the detail panel header carries the Agent 实况 entry and opens the web', () => {
+    const dispose = vi.fn()
+    render(<CanvasTab canvas={model({
+      selectedId: 'b',
+      inspectSwarm: () => ({ state: () => swarmStateFake, subscribe: () => () => {}, dispose }) as never,
+    })} />)
+    const action = document.querySelector('[data-panel-action]') as HTMLButtonElement
+    expect(action).not.toBeNull()
+    expect(action.textContent).toContain('Agent 实况')
+    fireEvent.click(action)
+    expect(document.querySelector('[data-swarm-root]')).not.toBeNull()
+    fireEvent.click(document.querySelector('[data-swarm-close]') as Element)
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('no inspect capability means no header action', () => {
+    render(<CanvasTab canvas={model({ selectedId: 'b' })} />)
+    expect(document.querySelector('[data-panel-action]')).toBeNull()
+  })
+})

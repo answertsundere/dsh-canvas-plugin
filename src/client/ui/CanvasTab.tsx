@@ -28,6 +28,20 @@ const MAX_SCALE = 2
 /** Nominal viewport the fit-view button targets, in canvas units. */
 const FIT_VIEWPORT = { width: 1000, height: 600 }
 
+/**
+ * The canvas has no CSS pipeline (inline styles only), so the few things that
+ * need real CSS — the breathing halo keyframes and the ⌖ hover — ride in as a
+ * single injected sheet. The halo color comes from each card's --breath-color,
+ * which is the status's own color.
+ */
+const CANVAS_CSS = `
+@keyframes dshCanvasBreath {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 18px 3px var(--breath-color); }
+}
+.dsh-canvas-inspect:hover { color: ${theme.text}; border-color: ${theme.accent}; }
+`
+
 export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<RightPanelTab>('detail')
@@ -181,6 +195,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
       data-canvas-root
       style={{ height: '100%', display: 'flex', flexDirection: 'column', background: theme.bg, color: theme.text, position: 'relative' }}
     >
+      <style>{CANVAS_CSS}</style>
       {swarm !== null && (
         <AgentSwarmView swarm={swarm.state()} onClose={closeSwarm} />
       )}
@@ -267,11 +282,12 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
 
             {[...canvas.graph.nodes.values()].map(node => {
               const nodeTail = canvas.tailOf?.(node.id) ?? null
+              const nodeStatus = canvas.statusOf(node.id)
               return (
                 <NodeCard
                   key={node.id}
                   node={node}
-                  status={canvas.statusOf(node.id)}
+                  status={nodeStatus}
                   position={layout.positions.get(node.id) ?? { x: 0, y: 0 }}
                   width={NODE_WIDTH}
                   height={NODE_HEIGHT}
@@ -280,6 +296,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   parallelWrite={parallelWrite.has(node.id)}
                   highlight={needle !== '' && matches(node.title, node.id, needle)}
                   live={nodeTail === null ? null : tailSnippet(nodeTail, 40)}
+                  active={nodeStatus.kind === 'thinking' || nodeStatus.kind === 'tool' || nodeTail !== null}
                   now={now}
                   onClick={handleNodeClick}
                   onOpen={id => canvas.openInChat?.(id)}
@@ -294,6 +311,13 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
           <RightPanel
             tab={tab}
             title={selectedNode?.title}
+            headerAction={canvas.inspectSwarm !== undefined && selectedId !== undefined
+              ? {
+                  label: '⌖ Agent 实况',
+                  title: '查看这个会话的 agent 蛛网：谁在跑、正在输出什么',
+                  onClick: () => openSwarm(selectedId),
+                }
+              : undefined}
             onTabChange={setTab}
             onClose={() => canvas.clearSelection?.()}
           >
