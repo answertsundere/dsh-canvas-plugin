@@ -64,6 +64,16 @@ rough order of risk:
    the root — a bare `pnpm add` then writes lockfile entries and symlinks into
    the wrong project with no error. The repo pins `.npmrc` `ignore-workspace=true`;
    if that file is ever removed, reinstall from a clean `node_modules`.
+9. **The live streaming tail depends on the `assistant/live-chunk` contract.**
+   Transient window rows (`SessionEventLikeEntry`, `AssistantLiveChunkEvent`)
+   carry `StreamChunk` deltas (`block-start` / `text-delta` / `reasoning-delta` /
+   `tool-call-delta` / `block-end`) that a durable `assistant/message` or
+   `assistant/attempt` settles atomically. A DSH upgrade that renames chunk
+   kinds, changes the settle pair, or stops emitting transient rows degrades the
+   canvas to "no snippet" silently — the live tail is additive by design, so the
+   failure mode is an empty live block, never a broken tab. `src/client/live/live-tail.ts`
+   skips unknown chunk kinds rather than throwing; re-verify against
+   `api/session-controller/src/client/contract/events.ts` on any upgrade.
 
 ## Not verified
 

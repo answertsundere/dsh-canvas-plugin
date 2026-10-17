@@ -19,6 +19,7 @@ DSH supports forking natively and the sidebar lists sessions, but:
 - **Two launch modes** — 「run now」 queues the instruction into the child; 「create empty branch」 sends nothing at all.
 - **Deterministic comparison** — compares only events after each branch's `inheritedEventCount`, aligned positionally, never semantically. 「Carry conclusion」 produces an **editable draft** and never submits.
 - **Three-state status** — confirmed (idle/queued/failed/done), inferred (thinking/tool), unknown (disconnected). **Never infers idle from silence.**
+- **Live streaming output** — a running branch's in-flight assistant stream is visible on the canvas: the node card shows the newest line (reasoning / answer / tool), and the selected branch's detail panel shows the full live reasoning and answer text, updated per chunk and folded into the turn list when the durable message settles. While a stream is visible the status badge is driven by it (thinking vs tool), so a running node is no longer a guess.
 
 ## Install
 

@@ -7,6 +7,7 @@
  * at `639ed01539` (`@deepseek-ai/dsh-api-session-controller/client`,
  * `@deepseek-ai/dsh-client-ui-conversation/client`) rather than online docs.
  */
+import type { LiveEntryLike } from '../live/live-tail.ts'
 
 /**
  * The retain label this plugin owns, so M0 gate 11 can attribute every retain
@@ -124,6 +125,79 @@ export async function openTimeline(
       await binding.session.loadOlder()
       return target.getSnapshot() !== before
     },
+    release: () => {
+      if (released) return
+      released = true
+      reference.release()
+    },
+  }
+}
+
+/** One window row as the host hands it over; shape-checked in the live-tail module. */
+export interface LiveWindowBindingLike {
+  readonly sessionId: string
+  readonly eventSource: ObservableSnapshotLike<unknown>
+}
+
+export interface LiveWindowReferenceLike {
+  readonly sessionId: string
+  readonly ready: Promise<LiveWindowBindingLike>
+  release(): void
+}
+
+export interface LiveWindowSessionsLike {
+  retain(target: string, options: { readonly source: typeof CANVAS_RETAIN_SOURCE }): LiveWindowReferenceLike
+}
+
+/**
+ * The live half of the timeline: the raw event window, transient stream rows
+ * included. Unlike `openTimeline` this never touches `uiConversation.binding`,
+ * so it cannot be refused by the inactive-session guard — the window is read
+ * off the retain's own binding.
+ */
+export interface LiveWindowSource {
+  readonly sessionId: string
+  /** Fresh read of the window's entries; malformed windows read as empty. */
+  entries(): readonly LiveEntryLike[]
+  subscribe(listener: () => void): () => void
+  /** Idempotent: safe on selection change, tab close, and plugin unload. */
+  release(): void
+}
+
+/**
+ * Retains one Session and keeps its event window open for live reading.
+ *
+ * Same lifecycle contract as `openTimeline`: release before rethrowing on
+ * failure, and release idempotently. The default window page is the recent
+ * tail, which is exactly what a live view needs; older pages are the
+ * `openTimeline`/`loadOlder` path's job.
+ */
+export async function openLiveWindow(
+  sessions: LiveWindowSessionsLike,
+  sessionId: string,
+): Promise<LiveWindowSource> {
+  const reference = sessions.retain(sessionId, { source: CANVAS_RETAIN_SOURCE })
+
+  let binding: LiveWindowBindingLike
+  try {
+    binding = await reference.ready
+  } catch (error) {
+    reference.release()
+    throw error
+  }
+
+  const entries = (): readonly LiveEntryLike[] => {
+    const snapshot = binding.eventSource.getSnapshot()
+    if (snapshot === null || typeof snapshot !== 'object') return []
+    const rows = (snapshot as { entries?: unknown }).entries
+    return Array.isArray(rows) ? rows as readonly LiveEntryLike[] : []
+  }
+
+  let released = false
+  return {
+    sessionId,
+    entries,
+    subscribe: listener => binding.eventSource.subscribe(listener),
     release: () => {
       if (released) return
       released = true

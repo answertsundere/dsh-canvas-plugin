@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { apply, inject } from '../src/client/index.ts'
 import { CanvasTab } from '../src/client/ui/CanvasTab.tsx'
 import type { CanvasDetail, CanvasModel } from '../src/client/ui/canvas-model.ts'
+import type { LiveTail } from '../src/client/live/live-tail.ts'
 import { badge } from '../src/shared/status.ts'
 import type { CanvasGraph, CanvasNode } from '../src/shared/contracts.ts'
 
@@ -370,5 +371,76 @@ describe('CanvasTab right panel', () => {
     fireEvent.click(container.querySelector('[data-carry="a"]') as Element)
     fireEvent.click(container.querySelector('[data-carry-send]') as Element)
     await waitFor(() => expect(container.querySelector('[data-carry-done]')).not.toBeNull())
+  })
+})
+
+const liveTailOf = (over: Partial<LiveTail> = {}): LiveTail => ({
+  attemptId: 'a1', turn: 0, step: 1, seq: 9, phase: 'thinking',
+  reasoning: '分析目录结构', text: '', ...over,
+})
+
+describe('canvas live output', () => {
+  it('shows a live snippet on a streaming node card', () => {
+    const tail = liveTailOf()
+    render(<CanvasTab canvas={model({ tailOf: id => (id === 'b' ? tail : null) })} />)
+    const card = document.querySelector('[data-canvas-node="b"]')
+    expect(card?.querySelector('[data-node-live]')?.textContent).toContain('分析目录结构')
+    expect(document.querySelector('[data-canvas-node="a"] [data-node-live]')).toBeNull()
+  })
+
+  it('shows the answer text on the card once the model starts emitting it', () => {
+    const tail = liveTailOf({ text: '正在写代码', phase: 'thinking' })
+    render(<CanvasTab canvas={model({ tailOf: id => (id === 'b' ? tail : null) })} />)
+    const live = document.querySelector('[data-canvas-node="b"] [data-node-live]')
+    expect(live?.textContent).toContain('正在写代码')
+    expect(live?.textContent).not.toContain('分析目录结构')
+  })
+
+  it('renders the live stream in the detail panel of the selected node', () => {
+    const detail: CanvasDetail = { sessionId: 'b', turns: [], inheritedCount: 0, cwdWarning: false }
+    const tail = liveTailOf({ text: '答案前半' })
+    render(<CanvasTab canvas={model({ selectedId: 'b', liveDetail: () => detail, tailOf: () => tail })} />)
+    expect(document.querySelector('[data-live-tail]')).not.toBeNull()
+    expect(document.querySelector('[data-live-reasoning]')?.textContent).toContain('分析目录结构')
+    expect(document.querySelector('[data-live-text]')?.textContent).toContain('答案前半')
+  })
+
+  it('prefers the live detail and skips the one-shot read while the window is open', () => {
+    const detail: CanvasDetail = { sessionId: 'b', turns: [], inheritedCount: 0, cwdWarning: false }
+    const oneShot = vi.fn(async () => detail)
+    render(<CanvasTab canvas={model({ selectedId: 'b', liveDetail: () => detail, detail: oneShot })} />)
+    expect(oneShot).not.toHaveBeenCalled()
+  })
+
+  it('falls back to the one-shot read when the live window closes', async () => {
+    const detail: CanvasDetail = { sessionId: 'b', turns: [], inheritedCount: 0, cwdWarning: false }
+    let live = true
+    const oneShot = vi.fn(async () => detail)
+    const m = model({ selectedId: 'b', liveDetail: () => (live ? detail : null), detail: oneShot })
+    const view = render(<CanvasTab canvas={m} />)
+    expect(oneShot).not.toHaveBeenCalled()
+    live = false
+    view.rerender(<CanvasTab canvas={m} />)
+    await waitFor(() => { expect(oneShot).toHaveBeenCalledTimes(1) })
+  })
+})
+
+describe('fork from a live branch', () => {
+  it('opens the fork dialog from a row while the branch streams', async () => {
+    // Regression: the live path leaves the one-shot `detail` state null, so the
+    // fork action must read the effective detail (live window first).
+    const turns = [{
+      index: 0, userMessage: '你好', tools: [], firstSeq: 1, lastSeq: 4, synthetic: false,
+    }]
+    const detail: CanvasDetail = { sessionId: 'b', turns, inheritedCount: 0, cwdWarning: false }
+    render(<CanvasTab canvas={model({
+      selectedId: 'b',
+      liveDetail: () => detail,
+      // No one-shot read result: the effect skips it while the window is open.
+      detail: undefined,
+    })} />)
+    fireEvent.click(document.querySelector('[data-fork-row="0"]') as Element)
+    expect(document.querySelector('[data-fork-dialog]')).not.toBeNull()
+    expect(document.querySelector('[data-fork-cut]')?.textContent).toContain('seq 4')
   })
 })

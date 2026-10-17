@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render } from '@testing-library/react'
 import { BranchTimeline, cutSeqAt } from '../src/client/ui/BranchTimeline.tsx'
 import { ForkDialog } from '../src/client/ui/ForkDialog.tsx'
 import { RightPanel } from '../src/client/ui/RightPanel.tsx'
+import type { LiveTail } from '../src/client/live/live-tail.ts'
 import type { BranchTurn } from '../src/shared/contracts.ts'
 
 afterEach(cleanup)
@@ -195,5 +196,50 @@ describe('RightPanel', () => {
     fireEvent.click(container.querySelector('[data-panel-close]') as Element)
     expect(onClose).toHaveBeenCalledTimes(1)
     expect(container.querySelector('[data-panel-content]')).not.toBeNull()
+  })
+})
+
+const liveTailFixture: LiveTail = {
+  attemptId: 'a1', turn: 0, step: 1, seq: 9, phase: 'thinking',
+  reasoning: '先确认目录', text: '好的，我来处理', tool: { name: 'read', arguments: '{"path":"a"}' },
+}
+
+describe('BranchTimeline live output', () => {
+  it('renders the in-flight reasoning, answer and tool while a branch streams', () => {
+    render(
+      <BranchTimeline
+        turns={[]}
+        inheritedCount={0}
+        cwdWarning={false}
+        onFork={() => {}}
+        live={liveTailFixture}
+      />,
+    )
+    expect(document.querySelector('[data-live-tail]')).not.toBeNull()
+    expect(document.querySelector('[data-live-reasoning]')?.textContent).toContain('先确认目录')
+    expect(document.querySelector('[data-live-text]')?.textContent).toContain('好的，我来处理')
+    expect(document.querySelector('[data-live-tool]')?.textContent).toContain('read')
+  })
+
+  it('renders no live block when nothing is streaming', () => {
+    render(<BranchTimeline turns={[]} inheritedCount={0} cwdWarning={false} onFork={() => {}} live={null} />)
+    expect(document.querySelector('[data-live-tail]')).toBeNull()
+    render(<BranchTimeline turns={[]} inheritedCount={0} cwdWarning={false} onFork={() => {}} />)
+    expect(document.querySelector('[data-live-tail]')).toBeNull()
+  })
+
+  it('marks the tool phase so a running call is distinguishable from reasoning', () => {
+    render(
+      <BranchTimeline
+        turns={[]}
+        inheritedCount={0}
+        cwdWarning={false}
+        onFork={() => {}}
+        live={{ ...liveTailFixture, reasoning: '', text: '', phase: 'tool' }}
+      />,
+    )
+    expect(document.querySelector('[data-live-tail]')?.getAttribute('data-live-phase')).toBe('tool')
+    expect(document.querySelector('[data-live-reasoning]')).toBeNull()
+    expect(document.querySelector('[data-live-text]')).toBeNull()
   })
 })

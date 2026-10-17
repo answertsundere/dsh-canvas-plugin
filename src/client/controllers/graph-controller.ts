@@ -1,4 +1,4 @@
-import type { CanvasGraph, ComparisonResult, LaunchMode, SessionId } from '../../shared/contracts.ts'
+import type { CanvasGraph, CanvasNode, ComparisonResult, LaunchMode, SessionId } from '../../shared/contracts.ts'
 import { badge, type StatusBadge } from '../../shared/status.ts'
 import { buildLineageGraph } from '../graph/graph-model.ts'
 import { toSummaries } from '../adapters/session-adapter.ts'
@@ -7,8 +7,20 @@ import { deriveStatus, type RuntimeHint } from '../adapters/runtime-status-adapt
 import { inheritedPrefixLength, segmentFromEvents, type SessionEventLike } from '../compare/branch-segment.ts'
 import { compareBranches } from '../compare/diff.ts'
 import { parallelWriteIds } from '../graph/parallel-write.ts'
+import { liveTailFromEntries, type LiveEntryLike, type LiveTail } from '../live/live-tail.ts'
 import { runForkTransaction, type ForkDeps, type ForkResult } from './fork-controller.ts'
 import { IDENTITY_VIEW, type CanvasDetail, type CanvasModel, type CanvasView } from '../ui/canvas-model.ts'
+
+/**
+ * An open window over one session's event stream. Structural mirror of the
+ * event-stream adapter's `LiveWindowSource`, so tests need no host.
+ */
+export interface LiveWindowLike {
+  readonly sessionId: string
+  entries(): readonly LiveEntryLike[]
+  subscribe(listener: () => void): () => void
+  release(): void
+}
 
 /**
  * Everything the controller needs from DSH, expressed structurally so tests
@@ -31,6 +43,11 @@ export interface GraphControllerDeps {
   readonly forkDeps: ForkDeps
   /** Durable events of one session, for comparison. */
   readEvents(sessionId: SessionId): Promise<readonly SessionEventLike[]>
+  /**
+   * Opens a live event window for one running session. Absent → the canvas
+   * has no live tails and falls back to the coarse running status.
+   */
+  liveWindow?(sessionId: SessionId): Promise<LiveWindowLike>
 }
 
 export interface GraphController {
@@ -46,6 +63,8 @@ export interface GraphController {
   /** Null until exactly two branches are selected, or when their events cannot be read. */
   compare(): Promise<ComparisonResult | null>
   subscribe(listener: () => void): () => void
+  /** Releases every open live window. Plugin unload must leave no retains. */
+  dispose(): void
 }
 
 const EMPTY_GRAPH: CanvasGraph = { nodes: new Map(), roots: [], maxDepth: 0 }
@@ -59,8 +78,112 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
   let view: CanvasView = IDENTITY_VIEW
   const listeners = new Set<() => void>()
 
+  /**
+   * Live windows, one per running node. Bounded by the number of sessions that
+   * are actually running (normally 0–2), and every one of them is released the
+   * moment its session stops running or the controller is disposed.
+   */
+  const liveWindows = new Map<SessionId, { source: LiveWindowLike; off: () => void }>()
+  const liveTails = new Map<SessionId, LiveTail | null>()
+  const liveDetails = new Map<SessionId, CanvasDetail>()
+  const pendingWindows = new Set<SessionId>()
+
   const notify = (): void => {
     for (const listener of [...listeners]) listener()
+  }
+
+  /**
+   * One node's badge. A live tail is the best hint there is: a streaming tool
+   * call reads as 工具执行, streaming text or reasoning as 思考中 — the running
+   * status stops being a guess while the canvas can see the stream.
+   */
+  const statusFor = (node: CanvasNode, tail: LiveTail | null | undefined): StatusBadge => {
+    const hint = tail == null
+      ? deps.hintOf?.(node.id)
+      : (tail.phase === 'tool' ? 'tool' : 'thinking')
+    return badge(deriveStatus({
+      connected: deps.isConnected(),
+      available: node.available,
+      running: node.running,
+      ...(hint === undefined ? {} : { lastHint: hint }),
+    }))
+  }
+
+  /** One node's own turns, derived from its open window, for the detail panel. */
+  const deriveLiveDetail = (id: SessionId): CanvasDetail | null => {
+    const held = liveWindows.get(id)
+    if (held === undefined) return null
+    const events: SessionEventLike[] = []
+    for (const entry of held.source.entries()) {
+      if (entry.type !== 'event') continue
+      events.push({ seq: Number(entry.event.seq), type: entry.event.type, data: entry.event.data })
+    }
+    const inheritedCount = inheritedPrefixLength(events)
+    return {
+      sessionId: id,
+      turns: segmentFromEvents(id, inheritedCount, events).turns,
+      inheritedCount,
+      cwdWarning: parallelWriteIds(graph).has(id),
+    }
+  }
+
+  const refreshNode = (id: SessionId): void => {
+    const node = graph.nodes.get(id)
+    if (node === undefined) return
+    statuses.set(id, statusFor(node, liveTails.get(id)))
+  }
+
+  const handleWindowChange = (id: SessionId, source: LiveWindowLike): void => {
+    const held = liveWindows.get(id)
+    // A window replaced or closed since the subscription was made must not write.
+    if (held === undefined || held.source !== source) return
+    liveTails.set(id, liveTailFromEntries(source.entries()))
+    const detail = deriveLiveDetail(id)
+    if (detail === null) liveDetails.delete(id)
+    else liveDetails.set(id, detail)
+    refreshNode(id)
+    notify()
+  }
+
+  const closeLiveWindow = (id: SessionId): void => {
+    const held = liveWindows.get(id)
+    if (held === undefined) return
+    liveWindows.delete(id)
+    liveTails.delete(id)
+    liveDetails.delete(id)
+    held.off()
+    held.source.release()
+  }
+
+  /** Opens windows for new running nodes and closes them for nodes that stopped. */
+  const syncLiveWindows = (): void => {
+    const open = deps.liveWindow
+    if (open === undefined) return
+    const running = new Set<SessionId>()
+    for (const node of graph.nodes.values()) if (node.running) running.add(node.id)
+    for (const id of [...liveWindows.keys()]) if (!running.has(id)) closeLiveWindow(id)
+    for (const id of running) {
+      if (liveWindows.has(id) || pendingWindows.has(id)) continue
+      pendingWindows.add(id)
+      void open(id).then(source => {
+        pendingWindows.delete(id)
+        // The session may have stopped, or a second window raced open first.
+        if (graph.nodes.get(id)?.running !== true || liveWindows.has(id)) {
+          source.release()
+          return
+        }
+        const off = source.subscribe(() => { handleWindowChange(id, source) })
+        liveWindows.set(id, { source, off })
+        liveTails.set(id, liveTailFromEntries(source.entries()))
+        const detail = deriveLiveDetail(id)
+        if (detail !== null) liveDetails.set(id, detail)
+        refreshNode(id)
+        notify()
+      }).catch(() => {
+        // A window that refuses to open costs the live view, never the canvas.
+        pendingWindows.delete(id)
+      })
+    }
   }
 
   const refresh = (): void => {
@@ -74,17 +197,10 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
     )
     graph = buildLineageGraph(selection.members, new Set(selection.members.map(summary => summary.id)))
 
-    const connected = deps.isConnected()
     statuses = new Map()
-    for (const node of graph.nodes.values()) {
-      const hint = deps.hintOf?.(node.id)
-      statuses.set(node.id, badge(deriveStatus({
-        connected,
-        available: node.available,
-        running: node.running,
-        ...(hint === undefined ? {} : { lastHint: hint }),
-      })))
-    }
+    for (const node of graph.nodes.values()) statuses.set(node.id, statusFor(node, liveTails.get(node.id)))
+
+    syncLiveWindows()
 
     // A selection or comparison that left the workspace must not linger.
     if (selectedId !== undefined && !graph.nodes.has(selectedId)) selectedId = undefined
@@ -199,6 +315,8 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
       return () => { listeners.delete(listener) }
     },
     detail,
+    liveDetail: id => liveDetails.get(id) ?? null,
+    tailOf: id => liveTails.get(id) ?? null,
     comparison: compare,
     forkFromRow,
     openInChat,
@@ -210,8 +328,16 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
   })
 
   refresh()
-  return { model, refresh, select, toggleCompare, search, openInChat, forkFromRow, compare, subscribe: listener => {
-    listeners.add(listener)
-    return () => { listeners.delete(listener) }
-  } }
+  return {
+    model, refresh, select, toggleCompare, search, openInChat, forkFromRow, compare,
+    subscribe: listener => {
+      listeners.add(listener)
+      return () => { listeners.delete(listener) }
+    },
+    dispose: () => {
+      for (const id of [...liveWindows.keys()]) closeLiveWindow(id)
+      liveTails.clear()
+      liveDetails.clear()
+    },
+  }
 }

@@ -9,10 +9,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { NS, en, zh } from './locales.ts'
 import { CanvasTab } from './ui/CanvasTab.tsx'
-import { CANVAS_RETAIN_SOURCE } from './adapters/event-stream-adapter.ts'
+import { CANVAS_RETAIN_SOURCE, openLiveWindow } from './adapters/event-stream-adapter.ts'
 import { toSummaries } from './adapters/session-adapter.ts'
 import { toWorkspaceItems } from './adapters/workspace-adapter.ts'
-import { createGraphController, type GraphControllerDeps } from './controllers/graph-controller.ts'
+import { createGraphController, type GraphController, type GraphControllerDeps } from './controllers/graph-controller.ts'
 import type { ForkDeps } from './controllers/fork-controller.ts'
 import type { CanvasModel } from './ui/canvas-model.ts'
 import type { SessionEventLike } from './compare/branch-segment.ts'
@@ -46,14 +46,17 @@ export function apply(ctx: Context): void {
 
   // One controller per conversation, cached so a re-render keeps the same model
   // object: the tab subscribes to that object for live updates, so handing out a
-  // fresh model every render would drop the subscription each time.
-  const models = new Map<string, CanvasModel>()
+  // fresh model every render would drop the subscription each time. The
+  // controller itself is kept so unload can dispose it — every open live
+  // window is a retain, and a retain the plugin forgets is residue.
+  const controllers = new Map<string, { controller: GraphController; model: CanvasModel }>()
 
   const modelFor = (sessionId: string): CanvasModel => {
-    const cached = models.get(sessionId)
-    if (cached !== undefined) return cached
-    const model = createGraphController(depsFor(ctx, sessionId)).model()
-    models.set(sessionId, model)
+    const cached = controllers.get(sessionId)
+    if (cached !== undefined) return cached.model
+    const controller = createGraphController(depsFor(ctx, sessionId))
+    const model = controller.model()
+    controllers.set(sessionId, { controller, model })
     return model
   }
 
@@ -65,13 +68,16 @@ export function apply(ctx: Context): void {
       const subscribe = (store as { subscribe?: unknown }).subscribe
       if (typeof subscribe !== 'function') continue
       offs.push((subscribe as (listener: () => void) => () => void).call(store, () => {
-        for (const model of models.values()) model.refresh?.()
+        for (const held of controllers.values()) held.controller.refresh()
       }))
     }
     return () => { for (const off of offs) off() }
   }, 'dsh-canvas: snapshot subscriptions')
 
-  ctx.effect(() => () => { models.clear() }, 'dsh-canvas: controller lifetime')
+  ctx.effect(() => () => {
+    for (const held of controllers.values()) held.controller.dispose()
+    controllers.clear()
+  }, 'dsh-canvas: controller lifetime')
 
   ctx.slots.inject('conversation.view', () => ctx.slots.register({
     name: 'conversation.view',
@@ -143,6 +149,11 @@ function depsFor(ctx: Context, sessionId: string): GraphControllerDeps {
     },
     openSession: id => ctx.uiWorkspace.openSession(asSessionId(id)),
     forkDeps,
+    // The adapter speaks plain strings and its own label literal; the boundary
+    // maps the target onto the branded `SessionTarget` the service takes.
+    liveWindow: id => openLiveWindow({
+      retain: (target, options) => ctx.sessions.retain(asSessionId(target), options),
+    }, id),
     readEvents: async id => {
       // A one-shot retain: comparison reads the window and lets go immediately,
       // so nothing stays pinned open after the panel closes.

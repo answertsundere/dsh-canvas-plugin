@@ -1,6 +1,7 @@
 import type { FC, MouseEvent } from 'react'
 import type { CanvasNode } from '../../shared/contracts.ts'
 import type { StatusBadge } from '../../shared/status.ts'
+import type { TailSnippet } from '../live/live-tail.ts'
 import { theme } from '../theme.ts'
 import type { LayoutPoint } from '../graph/graph-layout.ts'
 
@@ -16,6 +17,8 @@ export interface NodeCardProps {
   readonly parallelWrite: boolean
   /** The toolbar query matched this node. */
   readonly highlight: boolean
+  /** The node's in-flight output, when it is streaming. */
+  readonly live?: TailSnippet | null
   readonly now: number
   onClick(event: MouseEvent<HTMLDivElement>, id: string): void
   /** Opens the session in the conversation view. */
@@ -23,7 +26,7 @@ export interface NodeCardProps {
 }
 
 export const NodeCard: FC<NodeCardProps> = ({
-  node, status, position, width, height, selected, comparing, parallelWrite, highlight, now, onClick, onOpen,
+  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, now, onClick, onOpen,
 }) => (
   <div
     data-canvas-node={node.id}
@@ -73,6 +76,23 @@ export const NodeCard: FC<NodeCardProps> = ({
       {status.label} · {relativeTime(now, node.createdAt)} · {node.childCount} 分支
       {node.externalParent && <span title="父会话不在当前工作区"> · 外部父</span>}
     </div>
+    {live != null && (
+      <div
+        data-node-live
+        style={{
+          display: 'flex', gap: 4, marginTop: 2, overflow: 'hidden',
+          whiteSpace: 'nowrap', color: theme.muted,
+        }}
+      >
+        <span
+          data-node-live-label
+          style={{ flex: '0 0 auto', color: live.label === '工具' ? theme.accent : theme.muted }}
+        >
+          {live.label}
+        </span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{live.text}</span>
+      </div>
+    )}
     {parallelWrite && (
       <div data-node-parallel-write="true" style={{ color: theme.warn, marginTop: 2 }}>
         ⚠ 并行写入

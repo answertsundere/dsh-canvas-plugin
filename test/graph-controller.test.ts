@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createGraphController, type GraphControllerDeps } from '../src/client/controllers/graph-controller.ts'
 import type { ForkDeps, PromptOutcome } from '../src/client/controllers/fork-controller.ts'
 import type { SessionEventLike } from '../src/client/compare/branch-segment.ts'
+import type { LiveEntryLike } from '../src/client/live/live-tail.ts'
 
 const row = (id: string, extra: Record<string, unknown> = {}) => ({
   id,
@@ -306,5 +307,146 @@ describe('createGraphController', () => {
     // Identity of the *snapshot* changes, but every model reads the same state.
     controller.select('b')
     expect(controller.model().selectedId).toBe('b')
+  })
+})
+
+const flush = async (): Promise<void> => { await new Promise(resolve => setTimeout(resolve, 0)) }
+
+const makeLiveWindow = (sessionId: string) => {
+  const listeners = new Set<() => void>()
+  let entries: LiveEntryLike[] = []
+  const release = vi.fn()
+  const source = {
+    sessionId,
+    entries: () => entries,
+    subscribe: (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
+    release,
+  }
+  return {
+    source,
+    release,
+    entries: (next: LiveEntryLike[]) => { entries = next },
+    emit: () => { for (const listener of [...listeners]) listener() },
+  }
+}
+
+const reasoningEntries = (attemptId: string, text: string): LiveEntryLike[] => [
+  { type: 'transient', event: { type: 'assistant/live-chunk', seq: 10, data: { attemptId, turn: 0, step: 1, chunk: { type: 'block-start', index: 0, blockType: 'reasoning' } } } },
+  { type: 'transient', event: { type: 'assistant/live-chunk', seq: 11, data: { attemptId, turn: 0, step: 1, chunk: { type: 'reasoning-delta', index: 0, text } } } },
+]
+
+describe('live windows', () => {
+  it('opens one window per running session and releases it when the session stops', async () => {
+    const base = makeDeps()
+    const live = makeLiveWindow('b')
+    const opened: string[] = []
+    const deps: GraphControllerDeps = {
+      ...base.deps,
+      liveWindow: async id => { opened.push(id); return live.source },
+    }
+    const controller = createGraphController(deps)
+    await flush()
+    expect(opened).toEqual(['b'])
+    controller.model().tailOf?.('b')
+
+    base.setRows(['a', 'b'], {
+      a: row('a', { cwd: 'C:/w' }),
+      b: row('b', { parentId: 'a', cwd: 'C:/w', running: false }),
+    })
+    controller.refresh()
+    expect(live.release).toHaveBeenCalledTimes(1)
+    expect(controller.model().tailOf?.('b')).toBeNull()
+  })
+
+  it('a live chunk turns the node status into the real hint and notifies subscribers', async () => {
+    const base = makeDeps()
+    const live = makeLiveWindow('b')
+    const deps: GraphControllerDeps = { ...base.deps, liveWindow: async () => live.source }
+    const controller = createGraphController(deps)
+    const model = controller.model()
+    await flush()
+
+    const notified = vi.fn()
+    model.subscribe?.(notified)
+
+    live.entries(reasoningEntries('a1', '先看需求'))
+    live.emit()
+    expect(notified).toHaveBeenCalled()
+    expect(model.tailOf?.('b')?.reasoning).toBe('先看需求')
+    expect(model.statusOf('b').kind).toBe('thinking')
+
+    live.entries([
+      ...reasoningEntries('a1', '先看需求'),
+      { type: 'transient', event: { type: 'assistant/live-chunk', seq: 12, data: { attemptId: 'a1', turn: 0, step: 1, chunk: { type: 'block-start', index: 1, blockType: 'tool-call' } } } },
+      { type: 'transient', event: { type: 'assistant/live-chunk', seq: 13, data: { attemptId: 'a1', turn: 0, step: 1, chunk: { type: 'tool-call-delta', index: 1, id: 'c1', name: 'read', argumentsDelta: '{}' } } } },
+    ])
+    live.emit()
+    expect(model.statusOf('b').kind).toBe('tool')
+    expect(model.tailOf?.('b')?.tool?.name).toBe('read')
+  })
+
+  it('a window that refuses to open costs the live view, never the canvas', async () => {
+    const base = makeDeps()
+    const deps: GraphControllerDeps = {
+      ...base.deps,
+      liveWindow: async () => { throw new Error('retain refused') },
+    }
+    const controller = createGraphController(deps)
+    await flush()
+    expect(controller.model().tailOf?.('b')).toBeNull()
+    // The node still reports the coarse running status.
+    expect(controller.model().statusOf('b').kind).toBe('thinking')
+  })
+
+  it('derives the live detail (turns and inherited count) from the open window', async () => {
+    const base = makeDeps()
+    const live = makeLiveWindow('b')
+    const deps: GraphControllerDeps = { ...base.deps, liveWindow: async () => live.source }
+    const controller = createGraphController(deps)
+    await flush()
+
+    live.entries([
+      { type: 'event', event: { type: 'user/message', seq: 1, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '跑起来' }] } } },
+      { type: 'event', event: { type: 'turn/start', seq: 0, data: { turn: 0 } } },
+      ...reasoningEntries('a1', '正在做'),
+    ])
+    live.emit()
+
+    const detail = controller.model().liveDetail?.('b')
+    expect(detail).not.toBeNull()
+    expect(detail?.sessionId).toBe('b')
+    expect(detail?.turns.map(turn => turn.userMessage)).toEqual(['跑起来'])
+    expect(controller.model().liveDetail?.('a')).toBeNull()
+  })
+
+  it('closes the live detail when the session stops running', async () => {
+    const base = makeDeps()
+    const live = makeLiveWindow('b')
+    const deps: GraphControllerDeps = { ...base.deps, liveWindow: async () => live.source }
+    const controller = createGraphController(deps)
+    await flush()
+    live.entries(reasoningEntries('a1', 'x'))
+    live.emit()
+    expect(controller.model().liveDetail?.('b')).not.toBeNull()
+
+    base.setRows(['a', 'b'], {
+      a: row('a', { cwd: 'C:/w' }),
+      b: row('b', { parentId: 'a', cwd: 'C:/w', running: false }),
+    })
+    controller.refresh()
+    expect(controller.model().liveDetail?.('b')).toBeNull()
+  })
+})
+
+describe('dispose', () => {
+  it('releases every open window, so plugin unload leaves no retains', async () => {
+    const base = makeDeps()
+    const live = makeLiveWindow('b')
+    const deps: GraphControllerDeps = { ...base.deps, liveWindow: async () => live.source }
+    const controller = createGraphController(deps)
+    await flush()
+    controller.dispose()
+    expect(live.release).toHaveBeenCalledTimes(1)
+    expect(controller.model().tailOf?.('b')).toBeNull()
   })
 })

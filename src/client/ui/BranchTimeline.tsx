@@ -1,4 +1,5 @@
 import type { FC } from 'react'
+import type { LiveTail } from '../live/live-tail.ts'
 import type { BranchTurn } from '../../shared/contracts.ts'
 import { theme } from '../theme.ts'
 
@@ -9,6 +10,12 @@ export interface BranchTimelineProps {
   onFork(rowIndex: number): void
   /** Whether the shared-directory warning applies to this branch. */
   readonly cwdWarning: boolean
+  /**
+   * The branch's in-flight assistant output, when one is streaming. Rendered
+   * above the settled turns: it is where the newest output arrives, and it
+   * disappears on its own when the durable message settles it.
+   */
+  readonly live?: LiveTail | null
 }
 
 /**
@@ -26,7 +33,7 @@ export function cutSeqAt(turns: readonly BranchTurn[], rowIndex: number): number
   return turns[rowIndex]?.lastSeq
 }
 
-export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount, onFork, cwdWarning }) => (
+export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount, onFork, cwdWarning, live = null }) => (
   <div data-branch-timeline style={{ font: '12px/1.5 system-ui, sans-serif', color: theme.text }}>
     <div data-timeline-inherited style={{ color: theme.muted, padding: '6px 10px', borderBottom: `1px solid ${theme.border}` }}>
       继承 {inheritedCount} 个事件（不计入对比）
@@ -37,7 +44,41 @@ export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount,
       </div>
     )}
 
-    {turns.length === 0 && (
+    {live != null && (
+      <div
+        data-live-tail
+        data-live-phase={live.phase}
+        style={{ padding: '8px 10px', borderBottom: `1px solid ${theme.border}`, background: theme.card }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: theme.muted }}>
+          <span data-live-cursor style={{ color: theme.accent }}>▍</span>
+          <span>{live.phase === 'tool' ? '工具执行中' : '正在输出'}</span>
+          <span>第 {live.turn + 1} 轮 · 步骤 {live.step + 1}</span>
+        </div>
+        {live.reasoning !== '' && (
+          <div
+            data-live-reasoning
+            style={{ color: theme.muted, fontStyle: 'italic', marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+          >
+            {live.reasoning}
+          </div>
+        )}
+        {live.text !== '' && (
+          <div data-live-text style={{ marginTop: 4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{live.text}</div>
+        )}
+        {live.tool !== undefined && (
+          <div
+            data-live-tool
+            style={{ color: theme.accent, marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            title={`${live.tool.name} ${live.tool.arguments}`}
+          >
+            ⚙ {live.tool.name} {live.tool.arguments}
+          </div>
+        )}
+      </div>
+    )}
+
+    {turns.length === 0 && live == null && (
       <div data-timeline-empty style={{ color: theme.muted, padding: 10 }}>该分支还没有自己的事件</div>
     )}
 

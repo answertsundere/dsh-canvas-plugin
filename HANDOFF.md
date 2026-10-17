@@ -13,11 +13,11 @@
 
 | 维度 | 状态 |
 |---|---|
-| 计划任务 | 15/15 完成（Task 1–15b，含 14 桌面 profile、15 关卡收尾、15b 关卡 1 DOM；**16 类型合并清理**——恢复 3 个 `declare module` 合并，消除 3 处断言，补 `.npmrc` workspace 钉死） |
-| 测试 | **14 文件 / 175 测试全绿**（`vitest run`） |
-| 构建 | typecheck 干净；`lib/client.js` 76.03 kB / gzip 21.41 kB，lazy-CJS banner 完好 |
-| 安装 | **两个 profile 都已装**（Task 16 后已重装）：`web-0.1.7` 与 `desktop` 副本与 `lib/client.js` **逐字节一致**，`m0-check` 均 11/11 |
-| M0 关卡 | 1 **PASS（DOM，含卸载往返）**；2/5/6/7/12 UNIT（2 另有真实数据证据）；4 UNIT+SRC；9 UNIT（flap 语义）；10 **PASS（500 节点实测）**；3 UNIT；8 PARTIAL（未实测并行实况）；11 PARTIAL（retainInfo 残留未实测） |
+| 计划任务 | 16/16 完成（Task 1–15b、**16 类型合并清理**、**17 实时流式输出 + 关卡 8 实测**） |
+| 测试 | **15 文件 / 211 测试全绿**（`vitest run`） |
+| 构建 | typecheck 干净；`lib/client.js` 89.94 kB / gzip 24.55 kB，lazy-CJS banner 完好 |
+| 安装 | **两个 profile 都已装**（Task 17 后已重装）：`web-0.1.7` 与 `desktop` 副本与 `lib/client.js` **逐字节一致**，`m0-check` 均 11/11 |
+| M0 关卡 | 1 **PASS（DOM，含卸载往返）**；2/5/6/7/12 UNIT（2 另有真实数据证据）；4 UNIT+SRC；9 UNIT（flap 语义）；10 **PASS（500 节点实测）**；3 UNIT；**8 PASS（真实观察：两子分支并行 running=2 + 实时流片段）**；11 PARTIAL（retainInfo 残留未实测，dispose 释放窗口已有单测） |
 | 发布 | **阻塞**：npm 包名 `dsh-canvas` 被占用，需 `@<scope>/dsh-canvas`（见 §7 决策点） |
 
 ## 3. 真理文件地图（先读这些）
@@ -78,7 +78,7 @@ cd "D:/deepseek harness" && $PFX corepack pnpm dsh web-0.1.7 --port 3090 --no-op
 | 1 | **桌面 App 重启**验证 tab 条 | 已装好并验证过除目视外全部环节；bundle 行只在 host 启动时读，**重启决定权在用户**（App 正在跑，未擅杀） |
 | 2 | **npm 发布 scope 决策** | `dsh-canvas` 包名被占用（有人同名占位）。需用户定 scope 后联动改三处：`package.json` name、`cordis.patch.yml` name、`tsdown.config.ts` 的 `PLUGIN_ID`。**没定之前不要改名**——loader id 是已安装 profile 行的一部分 |
 | 3 | 关卡 11 残留实测 | 卸载后 `retainInfo().retainedBy.canvasNode` 归零（需 host 侧查询）；DOM 往返已证明 tab/节点干净消失 |
-| 4 | 关卡 8 并行实况 | 两个并行分支状态可观察，目前只有单测 + 订阅快照 |
+| 4 | ~~关卡 8 并行实况~~ | **已完成（Task 17，2026-10-17）**：真实会话上两个「立即开跑」子分支同时 `thinking`（running=2）+ 实时流片段，见 m0-verification「关卡 8」节 |
 | 5 | ~~可选清理：加依赖消除类型断言~~ | **已完成（Task 16，2026-10-17）**：三个 devDep 恢复全部 `declare module` 合并，消除 3 处断言；`index.ts` 仅剩 2 处品牌断言（无公开铸造函数，属边界惯例）。详见 plan 文档 Task 16 节 |
 
 ## 8. 给接管的 AI：建议启动顺序

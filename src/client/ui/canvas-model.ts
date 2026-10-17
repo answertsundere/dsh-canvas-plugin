@@ -1,4 +1,5 @@
 import type { BranchTurn, CanvasGraph, ComparisonResult, LaunchMode } from '../../shared/contracts.ts'
+import type { LiveTail } from '../live/live-tail.ts'
 import type { StatusBadge } from '../../shared/status.ts'
 
 /**
@@ -48,6 +49,13 @@ export interface CanvasModel {
   subscribe?(listener: () => void): () => void
   /** Loads a node's turns. Absent → the tab shows no detail panel. */
   detail?(id: string): Promise<CanvasDetail | null>
+  /**
+   * Live-updating detail for a node whose event window is open (running
+   * sessions). Null → fall back to `detail()`, which is a one-shot snapshot.
+   */
+  liveDetail?(id: string): CanvasDetail | null
+  /** The node's in-flight assistant output, or null when nothing is streaming. */
+  tailOf?(id: string): LiveTail | null
   /** Loads the comparison for the two picked branches. */
   comparison?(): Promise<ComparisonResult | null>
   /** Runs a fork from a timeline row. */

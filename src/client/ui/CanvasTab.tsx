@@ -6,6 +6,7 @@ import type { ComparisonResult, LaunchMode, SessionId } from '../../shared/contr
 import { theme } from '../theme.ts'
 import { layoutLayered, type LayoutPoint } from '../graph/graph-layout.ts'
 import { parallelWriteIds } from '../graph/parallel-write.ts'
+import { tailSnippet } from '../live/live-tail.ts'
 import { NodeCard } from './NodeCard.tsx'
 import { RightPanel, type RightPanelTab } from './RightPanel.tsx'
 import { BranchTimeline, cutSeqAt } from './BranchTimeline.tsx'
@@ -40,25 +41,35 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   const selectedId = canvas?.selectedId
   const compareKey = canvas?.compareIds.join('\u0000') ?? ''
 
+  // A running node has a live window; its detail updates in place, so the tab
+  // must not pay for (or overwrite it with) the one-shot read. Everything that
+  // acts on "the detail the user is looking at" — rows, fork cut, session id —
+  // reads this effective value, not the one-shot state.
+  const liveDetail = selectedId === undefined ? null : canvas?.liveDetail?.(selectedId) ?? null
+  const effectiveDetail = liveDetail ?? detail
+  const tail = selectedId === undefined ? null : canvas?.tailOf?.(selectedId) ?? null
+
   // The slot hands the tab a single model object for its lifetime, so live
   // updates arrive through the model's own invalidation channel rather than
   // through new props.
   useEffect(() => canvas?.subscribe?.(() => { bump() }), [canvas])
 
-  // A node's turns are read once when it is selected. The read is one-shot, so
-  // switching away has nothing to release.
+  // A node's turns come from its live window while one is open, and from a
+  // one-shot read otherwise — including when a running session stops and its
+  // window closes under the selection.
+  const hasLiveDetail = liveDetail !== null
   useEffect(() => {
     setTab('detail')
     setFork(null)
     setForkError(undefined)
-    if (canvas?.detail === undefined || selectedId === undefined) {
+    if (canvas?.detail === undefined || selectedId === undefined || hasLiveDetail) {
       setDetail(null)
       return
     }
     let live = true
     void canvas.detail(selectedId).then(next => { if (live) setDetail(next) })
     return () => { live = false }
-  }, [canvas, selectedId])
+  }, [canvas, selectedId, hasLiveDetail])
 
   useEffect(() => {
     if (tab !== 'compare' || canvas?.comparison === undefined) return
@@ -108,14 +119,14 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   }
 
   const openFork = (rowIndex: number): void => {
-    const atSeq = cutSeqAt(detail?.turns ?? [], rowIndex)
+    const atSeq = cutSeqAt(effectiveDetail?.turns ?? [], rowIndex)
     if (atSeq === undefined) return
     setForkError(undefined)
     setFork({ rowIndex, atSeq })
   }
 
   const confirmFork = async (instruction: string, mode: LaunchMode): Promise<void> => {
-    const sessionId = detail?.sessionId
+    const sessionId = effectiveDetail?.sessionId
     if (sessionId === undefined || fork === null || canvas.forkFromRow === undefined) return
     setForkBusy(true)
     setForkError(undefined)
@@ -228,23 +239,27 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
               ))}
             </svg>
 
-            {[...canvas.graph.nodes.values()].map(node => (
-              <NodeCard
-                key={node.id}
-                node={node}
-                status={canvas.statusOf(node.id)}
-                position={layout.positions.get(node.id) ?? { x: 0, y: 0 }}
-                width={NODE_WIDTH}
-                height={NODE_HEIGHT}
-                selected={canvas.selectedId === node.id}
-                comparing={canvas.compareIds.includes(node.id)}
-                parallelWrite={parallelWrite.has(node.id)}
-                highlight={needle !== '' && matches(node.title, node.id, needle)}
-                now={now}
-                onClick={handleNodeClick}
-                onOpen={id => canvas.openInChat?.(id)}
-              />
-            ))}
+            {[...canvas.graph.nodes.values()].map(node => {
+              const nodeTail = canvas.tailOf?.(node.id) ?? null
+              return (
+                <NodeCard
+                  key={node.id}
+                  node={node}
+                  status={canvas.statusOf(node.id)}
+                  position={layout.positions.get(node.id) ?? { x: 0, y: 0 }}
+                  width={NODE_WIDTH}
+                  height={NODE_HEIGHT}
+                  selected={canvas.selectedId === node.id}
+                  comparing={canvas.compareIds.includes(node.id)}
+                  parallelWrite={parallelWrite.has(node.id)}
+                  highlight={needle !== '' && matches(node.title, node.id, needle)}
+                  live={nodeTail === null ? null : tailSnippet(nodeTail, 40)}
+                  now={now}
+                  onClick={handleNodeClick}
+                  onOpen={id => canvas.openInChat?.(id)}
+                />
+              )
+            })}
           </div>
         </div>
 
@@ -257,9 +272,10 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
           >
             {tab === 'detail' ? (
               <BranchTimeline
-                turns={detail?.turns ?? []}
-                inheritedCount={detail?.inheritedCount ?? 0}
-                cwdWarning={detail?.cwdWarning ?? false}
+                turns={effectiveDetail?.turns ?? []}
+                inheritedCount={effectiveDetail?.inheritedCount ?? 0}
+                cwdWarning={effectiveDetail?.cwdWarning ?? false}
+                live={tail}
                 onFork={openFork}
               />
             ) : (
@@ -281,7 +297,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
             <ForkDialog
               open={fork !== null}
               atSeq={fork?.atSeq ?? 0}
-              inheritedCount={detail?.inheritedCount ?? 0}
+              inheritedCount={effectiveDetail?.inheritedCount ?? 0}
               busy={forkBusy}
               {...(forkError === undefined ? {} : { error: forkError })}
               onCancel={() => { setFork(null); setForkError(undefined) }}

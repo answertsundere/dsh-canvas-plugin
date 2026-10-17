@@ -836,6 +836,33 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 17: live streaming tail — see a running branch's reasoning on the canvas (2026-10-17, user-requested)
+
+**Request (user):** "现在画布看不到他们的实时推理流式输出" — the canvas must show what a running branch is actually emitting, live. This was the documented v1 boundary (Task 11 Step 3: the detail read is one-shot, "v1 therefore shows a snapshot of the branch, not a live-updating one").
+
+**Contract, verified against the checkout before writing code** (`api/session-controller/src/client/contract/events.ts`):
+- A window row is `{ type: 'event', event }` (durable) or `{ type: 'transient', event: AssistantLiveChunkEvent }` — client-only stream rows ordered by `seq` between durable seqs.
+- `AssistantLiveChunkEvent.data = { attemptId, turn, step, chunk: StreamChunk }`; `StreamChunk` variants: `block-start {index, blockType}`, `text-delta {index, text}`, `reasoning-delta {index, text}`, `tool-call-delta {index, id, name?, argumentsDelta}`, `block-end {index}` (`core/llm` types.d.ts:287+).
+- Settle: a durable `assistant/message` **or** `assistant/attempt` (`SessionAssistantSettlementEntry`) atomically supersedes one attempt's transient rows (window `change.kind === 'settle-assistant'`). The accumulation semantics mirror ui-chat's `updateChunk` (`ui-chat conversation-nodes/assistant.ts:92-130`), including `llm/retry` resetting a step — this module buckets by `attemptId` instead, so a retry's newer attempt simply wins.
+
+**Implementation (four layers, no DSH touchpoint outside the adapter/boundary):**
+- `src/client/live/live-tail.ts` (pure): `liveTailFromEntries` buckets transient chunks by attempt, accumulates reasoning/text/tool per block index in emission order, picks the attempt with the highest seq, and returns `null` when the latest attempt already settled (defensive guard — the window normally drops those rows itself). `tailSnippet(tail, limit)` renders the newest line for a node card (answer text wins, then reasoning; a streaming tool call reports its name; tail-anchored, whitespace-collapsed). Malformed rows are skipped, never thrown on.
+- `src/client/adapters/event-stream-adapter.ts`: `openLiveWindow(sessions, sessionId)` — retain under `canvasNode`, then read `binding.eventSource` directly. Unlike `openTimeline` it never touches `uiConversation.binding`, so it cannot hit the inactive-session throw; failure paths release before rethrowing; release is idempotent.
+- `src/client/controllers/graph-controller.ts`: one live window per **running** node (opened on refresh, released the moment the node stops running, `dispose()` releases all — plugin unload leaves no retains). A window change re-derives that node's tail and its live detail (turns via `segmentFromEvents` over the window's durable rows), then notifies. The live tail is also the best status hint there is: a streaming tool call reads as 工具执行, streaming text/reasoning as 思考中.
+- UI: `NodeCard` gains a `live` snippet line; `BranchTimeline` gains a live block (phase chip, reasoning in muted italics, answer text, the tool call with args, a ▍ cursor) above the settled rows; `CanvasTab` prefers the live detail and skips the one-shot read while a window is open, falling back the moment it closes.
+- `index.ts`: `liveWindow` wired through the boundary (brand cast for the target, the adapter's label literal for the source); the controller map now holds `{ controller, model }` so unload can dispose.
+
+**Bug found by the real-session run (the reason the live test was worth it):** forking from a **running** branch never opened the dialog — `openFork`/`confirmFork` read the one-shot `detail` state, which the live path deliberately leaves null. Fixed by reading `effectiveDetail = liveDetail ?? detail` everywhere the tab acts on "the detail the user sees"; pinned by a regression test (`fork from a live branch`).
+
+**Real-session evidence (web-0.1.7, the user's own workspace; screenshots local in `.verify/`):**
+- Live reasoning visible on the canvas while a real run streamed: node card snippet (`data-node-live` "推理…") and the detail panel's live block (`data-live-tail`, `data-live-phase=thinking`, `data-live-reasoning` containing the model's actual in-flight English reasoning about the prompt). Captured in `a-streaming-0/1.png` (run 2).
+- Gate 8, real form: two fork children launched back-to-back with 立即开跑 both reported `thinking` simultaneously (`running=2`, one streaming a snippet) at t=67s, both settled to idle afterwards — `run5-streaming.png`. The two forks were submitted **from the live detail panel of a running branch**, which is also the live proof of the fix above.
+- Environment note for anyone re-running this: the web profile's model backend queues runs by minutes; the earlier observation windows missed runs entirely, and a prompt sent now may start minutes later. Poll at ≥1s and budget 10+ minutes, or launch twin fork children (empty queues) to force overlap.
+
+**Numbers:** 15 files / **211 tests** green; bundle 89.94 kB / gzip 24.55 kB; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔

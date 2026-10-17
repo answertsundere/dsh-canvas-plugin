@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   CANVAS_RETAIN_SOURCE,
+  openLiveWindow,
   openTimeline,
   type OpenStateLike,
 } from '../src/client/adapters/event-stream-adapter.ts'
@@ -99,6 +100,77 @@ describe('openTimeline', () => {
   it('releases exactly once even when callers release twice', async () => {
     const fake = makeFake()
     const source = await openTimeline(fake.sessions, fake.uiConversation, 's1')
+    source.release()
+    source.release()
+    expect(fake.release).toHaveBeenCalledTimes(1)
+  })
+})
+
+const makeLiveFake = (options: { readyFails?: boolean; snapshot?: unknown } = {}) => {
+  const entries = [
+    { type: 'event', event: { type: 'user/message', seq: 1 } },
+    { type: 'transient', event: { type: 'assistant/live-chunk', seq: 2, data: {} } },
+  ]
+  let window: unknown = 'snapshot' in options ? options.snapshot : { entries, hasMore: false, revision: 1 }
+  const unsubscribe = vi.fn()
+  const eventSource = {
+    getSnapshot: vi.fn(() => window),
+    subscribe: vi.fn(() => unsubscribe),
+  }
+  const binding = { sessionId: 's1', eventSource }
+  const release = vi.fn()
+  const sessions = {
+    retain: vi.fn(() => ({
+      sessionId: 's1',
+      ready: options.readyFails === true ? Promise.reject(new Error('open failed')) : Promise.resolve(binding),
+      release,
+    })),
+  }
+  return { sessions, eventSource, release, unsubscribe, setWindow: (next: unknown) => { window = next } }
+}
+
+describe('openLiveWindow', () => {
+  it('retains the session under the canvas source label before reading the window', async () => {
+    const fake = makeLiveFake()
+    const source = await openLiveWindow(fake.sessions, 's1')
+    expect(fake.sessions.retain).toHaveBeenCalledWith('s1', { source: CANVAS_RETAIN_SOURCE })
+    expect(source.sessionId).toBe('s1')
+  })
+
+  it('exposes the window entries and delegates the subscription', async () => {
+    const fake = makeLiveFake()
+    const source = await openLiveWindow(fake.sessions, 's1')
+    expect(source.entries()).toHaveLength(2)
+    const listener = () => {}
+    const off = source.subscribe(listener)
+    expect(fake.eventSource.subscribe).toHaveBeenCalledWith(listener)
+    off()
+    expect(fake.unsubscribe).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads fresh entries on every snapshot call', async () => {
+    const fake = makeLiveFake()
+    const source = await openLiveWindow(fake.sessions, 's1')
+    expect(source.entries()).toHaveLength(2)
+    fake.setWindow({ entries: [{ type: 'event', event: { type: 'user/message', seq: 9 } }] })
+    expect(source.entries()).toHaveLength(1)
+  })
+
+  it('degrades a malformed window to no entries instead of throwing', async () => {
+    const fake = makeLiveFake({ snapshot: null })
+    const source = await openLiveWindow(fake.sessions, 's1')
+    expect(source.entries()).toEqual([])
+  })
+
+  it('releases the retain when the open fails, so a failed read leaks nothing', async () => {
+    const fake = makeLiveFake({ readyFails: true })
+    await expect(openLiveWindow(fake.sessions, 's1')).rejects.toThrow('open failed')
+    expect(fake.release).toHaveBeenCalledTimes(1)
+  })
+
+  it('releases exactly once even when callers release twice', async () => {
+    const fake = makeLiveFake()
+    const source = await openLiveWindow(fake.sessions, 's1')
     source.release()
     source.release()
     expect(fake.release).toHaveBeenCalledTimes(1)

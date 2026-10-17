@@ -1,6 +1,6 @@
 # M0 验证结果
 
-Date: 2026-10-17（同日两轮：gates 4/9/10 与关卡 1 DOM 往返）
+Date: 2026-10-17（同日四轮：gates 4/9/10、关卡 1 DOM 往返、Task 17 实时流 + 关卡 8 实测）
 Target: DSH `0.2.0-rc.2`，profile `web-0.1.7`，端口 3090
 Run: `pnpm verify` + `node scripts/m0-check.mjs` + `dsh web-0.1.7 --port 3090 --no-open` + Playwright（chromium-1223）
 
@@ -22,7 +22,7 @@ Run: `pnpm verify` + `node scripts/m0-check.mjs` + `dsh web-0.1.7 --port 3090 --
 | 5 | 自动启动一次 | UNIT | `fork-transaction.test.ts` |
 | 6 | fork 回执丢失恢复 | UNIT | `fork-transaction.test.ts` |
 | 7 | prompt 回执丢失恢复 | UNIT | `fork-transaction.test.ts` |
-| 8 | 并行运行可观察 | PARTIAL | 状态推导单测 + `apply` 订阅快照；未实测 |
+| 8 | 并行运行可观察 | **PASS（真实观察）** | 两个 fork 子会话同时 `thinking`（running=2），其一有实时流片段；见「关卡 8」节 |
 | 9 | 事件订阅韧性 | **UNIT（链路 flap 语义）** | `graph-controller.test.ts` 三例；真实断线未跑 |
 | 10 | 大规模性能 | **PASS** | `graph-scale.test.ts`，数据见「关卡 10」节 |
 | 11 | 卸载无残留 | PARTIAL | retain 释放有单测；未实测卸载残留 |
@@ -129,6 +129,23 @@ plugins/??...,@deepseek-ai/dsh-client-ui-trajectory/client.js,
 
 另有不变式断言：坐标有限、`y ≥ 0`、`x === depth × 240`。预算 5 s，实测余量三个数量级。同文件还钉住布局的两个既有缺陷模式：环不能漏放节点、链不能画成阶梯。
 
+## 关卡 8：并行分支实况（2026-10-17，真实会话实测）
+
+Task 17 的实时流功能把这一关从 PARTIAL 推到 PASS。方法：在用户真实会话上，从同一父分支连开**两个**「立即开跑」子分支（子会话队列为空，两者近乎同时开始运行）。
+
+观察结果（`run5-streaming.png`，Playwright 每秒轮询）：
+
+| 时刻 | 观察 |
+|---|---|
+| t=67s | `running=2`——两个子节点同时 `thinking`，其一节点卡带实时片段（`data-node-live` 显示推理文本）；两次分叉均从**运行中分支的 live 详情面板**提交成功 |
+| 结算 | 两节点先后回到 `idle`，画布上 8 个节点全部干净结算，0 pageerror |
+
+即：两个并行分支的运行状态在同一画面可观察，且运行中的分支同时展示实时推理流。
+
+顺带验证了 Task 17 修的那个 bug（运行中分支打不开分叉对话框）——本轮的两次分叉本身就是修复生效的证据；回归测试 `fork from a live branch` 另行钉住。
+
+**环境坑（复跑必读）**：这个 web profile 的模型后端**按分钟级排队**——提示词发出后可能几分钟才开始跑，且会在会话里排队串行执行。用 2s 轮询 + 短预算的观测窗口会整轮错过（本次实测前两轮就是这样空手而归）。要么 1s 轮询 + 10 分钟以上预算，要么像本轮一样用双「立即开跑」子分支强制重叠。
+
 ## 本次踩到的两个环境坑（都会静默失败）
 
 ### 1. pnpm 11 的 `allowBuilds` 占位符
@@ -169,9 +186,10 @@ cd "D:/deepseek harness" && corepack pnpm dsh web-0.1.7 --port 3090 --no-open   
 ## 下一步（剩余未跑项）
 
 1. 桌面 App 重启后目视 tab 条是否出现「画布」（与 web 侧机理相同，已双份验证，只是 App 无端口可自动探）。
-2. 卸载后 `retainInfo().retainedBy.canvasNode` 归零的实测（关卡 11 的残留部分）——DOM 往返已证明 tab 与节点干净消失，retain 记账需 host 侧查询。
+2. 卸载后 `retainInfo().retainedBy.canvasNode` 归零的实测（关卡 11 的残留部分）——DOM 往返已证明 tab 与节点干净消失；Task 17 后 dispose 会在卸载时释放全部 live 窗口（单测钉住），retain 记账仍需 host 侧查询。
 3. ~~用带鉴权的浏览器打开 `http://127.0.0.1:3090/?token=…`，确认 tab 条出现「画布」~~ **已完成**，见「关卡 1 的 DOM 级证据」节。
 4. ~~造一个带排队消息的会话，验证关卡 4。~~ 已以 SRC 口径完成（见「关卡 4」节）；若要升到真实证据，只需一次真实分叉 + 观察子会话无 turn/start。
 5. ~~断网/重连验证关卡 9。~~ flap 语义已有单测；transport 层重连属 host 行为，画布侧无可断言。
 6. ~~生成 500 节点 fixture 测关卡 10。~~ 已完成（见「关卡 10」节）。
-7. 发布阻塞：npm 上 `dsh-canvas` 包名已被占用，需改为 `@<scope>/dsh-canvas`（同步 package.json name / cordis.patch.yml / PLUGIN_ID），scope 待用户决定。
+7. ~~关卡 8 并行实况。~~ **已完成**（见「关卡 8」节）。
+8. 发布阻塞：npm 上 `dsh-canvas` 包名已被占用，需改为 `@<scope>/dsh-canvas`（同步 package.json name / cordis.patch.yml / PLUGIN_ID），scope 待用户决定。
