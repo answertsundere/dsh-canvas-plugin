@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { BranchTimeline, cutSeqAt } from '../src/client/ui/BranchTimeline.tsx'
 import { ForkDialog } from '../src/client/ui/ForkDialog.tsx'
 import { RightPanel } from '../src/client/ui/RightPanel.tsx'
@@ -281,5 +281,21 @@ describe('conclusion block', () => {
   it('says so when there is no conclusion yet', () => {
     render(<BranchTimeline turns={[]} inheritedCount={0} cwdWarning={false} onFork={() => {}} conclusion={null} />)
     expect(document.querySelector('[data-detail-conclusion]')?.textContent).toContain('还没有结论')
+  })
+})
+
+describe('conclusion copy', () => {
+  it('the 复制 button writes the conclusion to the clipboard', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.assign(navigator, { clipboard: { writeText } })
+    render(<BranchTimeline turns={[]} inheritedCount={0} cwdWarning={false} onFork={() => {}} conclusion="全部校验通过" />)
+    fireEvent.click(document.querySelector('[data-copy-conclusion]') as Element)
+    await waitFor(() => { expect(writeText).toHaveBeenCalledWith('全部校验通过') })
+    await waitFor(() => { expect(document.querySelector('[data-copy-done]')?.textContent).toBe('已复制') })
+  })
+
+  it('no 复制 button when there is nothing to copy', () => {
+    render(<BranchTimeline turns={[]} inheritedCount={0} cwdWarning={false} onFork={() => {}} conclusion={null} />)
+    expect(document.querySelector('[data-copy-conclusion]')).toBeNull()
   })
 })

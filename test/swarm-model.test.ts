@@ -433,3 +433,14 @@ describe('collapseTools', () => {
     expect(collapsed).toHaveLength(3)
   })
 })
+
+describe('tool failure messages', () => {
+  it('captures the error message from the result', () => {
+    const activity = activityFromEntries([
+      { type: 'event', event: { type: 'tool/call', seq: 1, data: { turn: 0, step: 1, callId: 'c1', name: 'pwsh', arguments: '{}' } } },
+      { type: 'event', event: { type: 'tool/result', seq: 2, data: { message: { toolCallId: 'c1' }, error: { message: 'exit code 1' } } } },
+    ])
+    expect(activity.tools[0]?.status).toBe('error')
+    expect(activity.tools[0]?.error).toBe('exit code 1')
+  })
+})

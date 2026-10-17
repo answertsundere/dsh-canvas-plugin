@@ -18,6 +18,10 @@ import { RobotAvatar, type RobotState } from './RobotAvatar.tsx'
 export interface AgentSwarmViewProps {
   readonly swarm: AgentSwarmState
   onClose(): void
+  /** Clicking a teammate robot jumps the main canvas to that session. */
+  onSelectAgent?(id: string): void
+  /** Double-clicking the root opens the session in the conversation. */
+  onOpenRoot?(): void
   /**
    * Frozen clock for tests and screenshots; absent → the view animates itself
    * (the controller only timestamps activity, the view is what moves).
@@ -169,14 +173,41 @@ const Comet: FC<{
  * dim sweep walks every thread in work order, on repeat — the web is never
  * still, and the sweep reads as the order the work actually ran in.
  */
-export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs }) => {
+export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSelectAgent, onOpenRoot, nowMs }) => {
   const [tick, setTick] = useState(() => Date.now())
   useEffect(() => {
     if (nowMs !== undefined) return
-    const timer = window.setInterval(() => setTick(Date.now()), 60)
+    const timer = window.setInterval(() => {
+      // A hidden document has no one watching; stop burning frames.
+      if (document.visibilityState === 'hidden') return
+      setTick(Date.now())
+    }, 60)
     return () => { window.clearInterval(timer) }
   }, [nowMs])
   const now = nowMs ?? tick
+
+  // Esc hands control back to the canvas, like 返回画布 does.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('keydown', onKey) }
+  }, [onClose])
+
+  // The palette choice survives reloads; storage failures degrade to
+  // session-only choice.
+  const [paletteId, setPaletteId] = useState(() => {
+    try {
+      return window.localStorage.getItem('dsh-canvas-palette') ?? 'aurora'
+    } catch {
+      return 'aurora'
+    }
+  })
+  const choosePalette = (id: string): void => {
+    setPaletteId(id)
+    try { window.localStorage.setItem('dsh-canvas-palette', id) } catch { /* private mode */ }
+  }
 
   // Fit the fixed plane into whatever room the overlay has: the web must never
   // require scrolling. Measured, not assumed; unknown sizes read as 1:1.
@@ -187,7 +218,6 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
-  const [paletteId, setPaletteId] = useState('aurora')
   const palette = SWARM_PALETTES.find(candidate => candidate.id === paletteId) ?? SWARM_PALETTES[0] as (typeof SWARM_PALETTES)[number]
   const accent = paletteAccent(palette, now)
   useEffect(() => {
@@ -243,6 +273,9 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
         <span style={{ fontWeight: 600 }}>Agent 实况</span>
         <span style={{ color: theme.muted }}>{swarm.rootLabel}</span>
         <span style={{ color: theme.muted }}>
+          {agents.filter(a => a.status === 'failed').length > 0 && (
+            <span style={{ color: '#e0554d' }}>失败 {agents.filter(a => a.status === 'failed').length} · </span>
+          )}
           {agents.length} 个 agent · 近 {swarm.activity.turnCount + (swarm.activity.openTurn ? 1 : 0)} 轮
           {swarm.activity.openTurn ? '（进行中）' : ''}
           {swarm.team != null ? ` · 团队 ${swarm.team.members.length} 人` : ''}
@@ -256,7 +289,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
               data-swarm-palette={candidate.id}
               data-active={candidate.id === paletteId ? 'true' : 'false'}
               title={candidate.label}
-              onClick={() => setPaletteId(candidate.id)}
+              onClick={() => choosePalette(candidate.id)}
               style={{
                 width: 14, height: 14, borderRadius: 7, padding: 0, cursor: 'pointer',
                 background: candidate.accent ?? 'linear-gradient(120deg, #f66, #6af, #2f9)',
@@ -473,8 +506,10 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
               <div
                 key={agent.id}
                 data-swarm-agent={agent.id}
+                onClick={onSelectAgent === undefined ? undefined : () => onSelectAgent(agent.id)}
                 style={{
                   ...chipStyle(agent.status === 'streaming', accent),
+                  cursor: onSelectAgent === undefined ? 'default' : 'pointer',
                   left: VIEW.width / 2 + p.x,
                   top: VIEW.height / 2 + p.y,
                   outline: `1px dashed ${statusColor(agent.status, accent)}`,
@@ -533,6 +568,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                 key={tool.id}
                 data-swarm-tool={tool.id}
                 data-swarm-tool-status={tool.status}
+                title={tool.error}
                 style={{
                   position: 'absolute',
                   transform: 'translate(-50%, -50%)',
@@ -576,6 +612,8 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
           <div
             data-swarm-agent={swarm.rootId}
             data-swarm-root-agent="true"
+            onDoubleClick={onOpenRoot}
+            title={onOpenRoot === undefined ? undefined : '双击打开对话'}
             style={{
               position: 'absolute',
               transform: 'translate(-50%, -50%)',

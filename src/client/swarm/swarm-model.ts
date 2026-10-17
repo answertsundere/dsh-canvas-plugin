@@ -41,6 +41,9 @@ const MAX_DEPTH = 2
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === 'object' && value !== null ? value as Record<string, unknown> : null
 
+const asString = (value: unknown): string | null =>
+  typeof value === 'string' ? value : null
+
 const catalogChildren = (entries: readonly unknown[]): { id: string; label?: string; mode: AgentNode['mode'] }[] => {
   const children: { id: string; label?: string; mode: AgentNode['mode'] }[] = []
   for (const entry of entries) {
@@ -185,6 +188,8 @@ export interface ActivityTool {
   readonly turn: number
   /** One-line preview of the call arguments, bounded for the chip. */
   readonly preview?: string
+  /** The result's error message, when the tool failed. */
+  readonly error?: string
 }
 
 /** What the inspected session itself is working through, from its own log. */
@@ -254,7 +259,13 @@ export function activityFromEntries(entries: readonly LiveEntryLike[], cap = ACT
         const callId = message === null ? undefined : message['toolCallId']
         if (typeof callId !== 'string') break
         const tool = [...tools].reverse().find(candidate => candidate.id === callId && candidate.status === 'pending')
-        if (tool !== undefined) tool.status = data !== null && data['error'] !== undefined ? 'error' : 'ok'
+        if (tool !== undefined) {
+          const failure = data === null ? null : asRecord(data['error'])
+          const failed = data !== null && data['error'] !== undefined
+          const message = failure === null ? null : asString(failure['message'])
+          ;(tool as { status: ActivityTool['status']; error?: string }).status = failed ? 'error' : 'ok'
+          if (failed && message !== null) (tool as { error?: string }).error = message
+        }
         break
       }
       default:
@@ -538,8 +549,10 @@ export interface CollapsedTool {
  * separate: their positions tell the order, and merging them would lie.
  */
 export function collapseTools(tools: readonly ActivityTool[]): CollapsedTool[] {
+  // Failures float to the front of the ring: they are what the user needs to see.
+  const ordered = [...tools].sort((a, b) => (a.status === 'error' ? -1 : 0) - (b.status === 'error' ? -1 : 0))
   const collapsed: CollapsedTool[] = []
-  for (const tool of tools) {
+  for (const tool of ordered) {
     const last = collapsed[collapsed.length - 1]
     if (last !== undefined && last.tool.name === tool.name && last.tool.status === tool.status) {
       collapsed[collapsed.length - 1] = { tool, count: last.count + 1 }

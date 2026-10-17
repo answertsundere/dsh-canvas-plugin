@@ -595,3 +595,34 @@ describe('minimap', () => {
     expect(view.scale).toBe(1)
   })
 })
+
+describe('full title tooltip', () => {
+  it('the card carries its full title as a tooltip', () => {
+    render(<CanvasTab canvas={model({
+      graph: graph([node('a', { title: '这是一个非常非常长的会话标题会被截断' })], ['a']),
+    })} />)
+    expect((document.querySelector('[data-canvas-node="a"]') as HTMLElement).title).toBe('这是一个非常非常长的会话标题会被截断')
+  })
+})
+
+describe('minimap node selection', () => {
+  it('clicking a minimap dot selects that node without recentering', () => {
+    const onSelect = vi.fn()
+    const onViewChange = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({ onSelect, onViewChange })} />)
+    onViewChange.mockClear()
+    fireEvent.click(container.querySelector('[data-minimap-node="a"]') as Element)
+    expect(onSelect).toHaveBeenCalledWith('a')
+    expect(onViewChange).not.toHaveBeenCalled()
+  })
+})
+
+describe('empty workspace hint', () => {
+  it('an empty canvas says so and notes the archive rule', () => {
+    const { container } = render(<CanvasTab canvas={model({
+      graph: graph([], []),
+    })} />)
+    expect(container.querySelector('[data-canvas-empty]')?.textContent).toContain('当前工作区还没有会话')
+    expect(container.querySelector('[data-canvas-empty]')?.textContent).toContain('归档的会话不会出现在画布上')
+  })
+})

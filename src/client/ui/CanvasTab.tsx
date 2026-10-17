@@ -83,7 +83,8 @@ const MiniMap: FC<{
   readonly canvas: CanvasModel
   readonly layout: { width: number; height: number; positions: ReadonlyMap<SessionId, LayoutPoint> }
   onViewChange(view: CanvasView): void
-}> = ({ canvas, layout, onViewChange }) => {
+  onSelectNode?(id: SessionId): void
+}> = ({ canvas, layout, onViewChange, onSelectNode }) => {
   const BOX = { width: 148, height: 96, pad: 6 }
   const scale = Math.min(
     BOX.width / Math.max(layout.width, 1),
@@ -125,12 +126,19 @@ const MiniMap: FC<{
         <span
           key={id}
           data-minimap-node={id}
+          title={canvas.graph.nodes.get(id)?.title}
+          onClick={event => {
+            if (onSelectNode === undefined) return
+            event.stopPropagation()
+            onSelectNode(id)
+          }}
           style={{
             position: 'absolute',
             left: BOX.pad + point.x * scale - 1.5,
             top: BOX.pad + point.y * scale - 1.5,
             width: 3, height: 3, borderRadius: 1.5,
             background: canvas.statusOf(id).color,
+            cursor: onSelectNode === undefined ? 'default' : 'pointer',
           }}
         />
       ))}
@@ -356,7 +364,18 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
     >
       <style>{CANVAS_CSS}</style>
       {swarm !== null && (
-        <AgentSwarmView swarm={swarm.state()} onClose={closeSwarm} />
+        <AgentSwarmView
+          swarm={swarm.state()}
+          onClose={closeSwarm}
+          onSelectAgent={id => {
+            closeSwarm()
+            canvas.onSelect(id)
+          }}
+          onOpenRoot={selectedId === undefined ? undefined : () => {
+            closeSwarm()
+            canvas.openInChat?.(selectedId)
+          }}
+        />
       )}
       {menu !== null && (
         <>
@@ -460,6 +479,19 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
           }}
           style={{ position: 'relative', flex: '1 1 auto', overflow: 'hidden', cursor: 'grab' }}
         >
+          {canvas.graph.nodes.size === 0 && (
+            <div
+              data-canvas-empty
+              style={{
+                position: 'absolute', inset: 0, display: 'flex',
+                flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                color: theme.muted, font: '13px system-ui, sans-serif', gap: 6,
+              }}
+            >
+              <span>当前工作区还没有会话</span>
+              <span style={{ fontSize: 11, opacity: 0.7 }}>归档的会话不会出现在画布上</span>
+            </div>
+          )}
           <div
             data-canvas-plane
             style={{
@@ -516,7 +548,12 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
         </div>
 
         {layout.width > 0 && (
-          <MiniMap canvas={canvas} layout={layout} onViewChange={canvas.onViewChange} />
+          <MiniMap
+            canvas={canvas}
+            layout={layout}
+            onViewChange={canvas.onViewChange}
+            onSelectNode={id => canvas.onSelect(id)}
+          />
         )}
 
         {selectedId !== undefined && (

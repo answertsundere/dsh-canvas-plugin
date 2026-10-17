@@ -346,3 +346,95 @@ describe('tool collapse and assignment edges', () => {
     expect(container.querySelector('[data-swarm-assign-edge="a"]')).not.toBeNull()
   })
 })
+
+describe('Esc close and palette persistence', () => {
+  it('Escape hands control back to the canvas', () => {
+    const onClose = vi.fn()
+    render(<AgentSwarmView swarm={swarmState()} onClose={onClose} nowMs={NOW} />)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('the palette choice is remembered across reloads', () => {
+    window.localStorage.setItem('dsh-canvas-palette', 'amber')
+    render(<AgentSwarmView swarm={swarmState()} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-palette="amber"]')?.getAttribute('data-active')).toBe('true')
+    window.localStorage.removeItem('dsh-canvas-palette')
+  })
+
+  it('choosing a palette writes it to localStorage', () => {
+    render(<AgentSwarmView swarm={swarmState()} onClose={() => {}} nowMs={NOW} />)
+    fireEvent.click(document.querySelector('[data-swarm-palette="violet"]') as Element)
+    expect(window.localStorage.getItem('dsh-canvas-palette')).toBe('violet')
+    window.localStorage.removeItem('dsh-canvas-palette')
+  })
+})
+
+describe('failure tooltips and tick pause', () => {
+  it('a failed tool card carries its error message as a tooltip', () => {
+    const state = activityState({
+      activity: {
+        turnCount: 0, openTurn: false, currentTurn: null,
+        tools: [{ id: 'x', name: 'pwsh', status: 'error', turn: 0, error: 'exit code 1' }],
+        pendingToolId: null,
+      },
+      toolLayout: { maxRadius: 400, positions: new Map([['x', { x: 100, y: -200 }]]) },
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    const chip = document.querySelector('[data-swarm-tool="x"]') as HTMLElement
+    expect(chip.title).toContain('exit code 1')
+  })
+
+  it('the stage hides behind the swarm overlay, so nodes are not clickable through it', () => {
+    render(<AgentSwarmView swarm={swarmState()} onClose={() => {}} nowMs={NOW} />)
+    // The overlay must actually cover the canvas: it is a positioned layer.
+    const root = document.querySelector('[data-swarm-root]') as HTMLElement
+    expect(root.style.zIndex).not.toBe('')
+  })
+})
+
+describe('agent chip navigation', () => {
+  it('clicking a teammate robot hands the session to the caller', () => {
+    const onSelectAgent = vi.fn()
+    render(<AgentSwarmView swarm={swarmState()} onClose={() => {}} onSelectAgent={onSelectAgent} nowMs={NOW} />)
+    fireEvent.click(document.querySelector('[data-swarm-agent="a"]') as Element)
+    expect(onSelectAgent).toHaveBeenCalledWith('a')
+  })
+
+  it('no navigation callback means chips are inert', () => {
+    render(<AgentSwarmView swarm={swarmState()} onClose={() => {}} nowMs={NOW} />)
+    expect((document.querySelector('[data-swarm-agent="a"]') as HTMLElement).style.cursor).toBe('default')
+  })
+})
+
+describe('rounds 8-9', () => {
+  it('the header counts failures and the root double-click opens the conversation', () => {
+    const onOpenRoot = vi.fn()
+    const state = activityState({
+      agents: [
+        { id: 'a', label: '检索器', depth: 1, status: 'failed', snippet: null, tail: null },
+      ],
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} onOpenRoot={onOpenRoot} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-root]')?.textContent).toContain('失败 1')
+    fireEvent.doubleClick(document.querySelector('[data-swarm-root-agent="true"]') as Element)
+    expect(onOpenRoot).toHaveBeenCalledTimes(1)
+  })
+
+  it('failed tools float to the front of the ring', () => {
+    const state = activityState({
+      activity: {
+        turnCount: 0, openTurn: false, currentTurn: null,
+        tools: [
+          { id: 'ok1', name: 'read', status: 'ok', turn: 0 },
+          { id: 'bad', name: 'pwsh', status: 'error', turn: 0 },
+        ],
+        pendingToolId: null,
+      },
+      toolLayout: { maxRadius: 400, positions: new Map([['bad', { x: 0, y: -300 }], ['ok1', { x: 200, y: -200 }]]) },
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    const chips = [...document.querySelectorAll('[data-swarm-tool]')]
+    expect(chips[0]?.getAttribute('data-swarm-tool')).toBe('bad')
+  })
+})

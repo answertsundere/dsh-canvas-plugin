@@ -40,6 +40,7 @@ export const NodeCard: FC<NodeCardProps> = ({
 }) => (
   <div
     data-canvas-node={node.id}
+    title={node.title}
     data-selected={selected ? 'true' : 'false'}
     data-comparing={comparing ? 'true' : 'false'}
     data-highlight={highlight ? 'true' : 'false'}

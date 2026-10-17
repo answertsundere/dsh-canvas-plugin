@@ -1,4 +1,4 @@
-import type { FC } from 'react'
+import { useState, type FC } from 'react'
 import type { LiveTail } from '../live/live-tail.ts'
 import type { BranchTurn } from '../../shared/contracts.ts'
 import { theme } from '../theme.ts'
@@ -35,13 +35,42 @@ export function cutSeqAt(turns: readonly BranchTurn[], rowIndex: number): number
   return turns[rowIndex]?.lastSeq
 }
 
-export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount, onFork, cwdWarning, live = null, conclusion }) => (
+export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount, onFork, cwdWarning, live = null, conclusion }) => {
+  const [copied, setCopied] = useState(false)
+  const copyConclusion = (): void => {
+    if (conclusion === null || conclusion === undefined) return
+    const clipboard = (globalThis as {
+      navigator?: { clipboard?: { writeText(text: string): Promise<void> } }
+    }).navigator?.clipboard
+    if (clipboard === undefined) return
+    void clipboard.writeText(conclusion).then(() => {
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 2000)
+    }).catch(() => { /* private mode: the button simply does nothing */ })
+  }
+  return (
   <div data-branch-timeline style={{ font: '12px/1.5 system-ui, sans-serif', color: theme.text }}>
     <div
       data-detail-conclusion
       style={{ padding: '8px 10px', borderBottom: `1px solid ${theme.border}`, background: theme.card }}
     >
-      <div style={{ color: theme.muted, marginBottom: 4 }}>最新结论</div>
+      <div style={{ color: theme.muted, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span>最新结论</span>
+        {conclusion != null && (
+          <button
+            type="button"
+            data-copy-conclusion
+            onClick={copyConclusion}
+            style={{
+              background: 'transparent', color: theme.accent, border: 'none',
+              font: 'inherit', cursor: 'pointer', padding: 0,
+            }}
+          >
+            复制
+          </button>
+        )}
+        {copied && <span data-copy-done style={{ color: theme.accent }}>已复制</span>}
+      </div>
       {conclusion
         ? <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{conclusion}</div>
         : <div style={{ color: theme.muted }}>还没有结论</div>}
@@ -136,4 +165,5 @@ export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount,
       </div>
     ))}
   </div>
-)
+  )
+}
