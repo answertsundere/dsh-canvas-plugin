@@ -1042,6 +1042,14 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 31: round 15 — the swarm root card shows the conclusion (2026-10-17)
+
+The inspected session's latest conclusion (the R5 conclusion logic, excluding the inherited prefix) renders on the swarm's root card under the live snippet — the 实况 view now answers "what did this session conclude" without opening the conversation. **331 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+Deep-optimization pass complete: **15 rounds** (R1–R15), 13 commits on top of `c53a873`, every round gated by verify + double-profile install + `m0-check` 11/11 ×2.
+
+---
+
 ## Self-Review Checklist (run before executing)
 
 1. **Spec coverage**: graph (T2,T8) · fork lifecycle (T5,T6,T9) · compare (T7,T10) · status (T3,T11) · workspace membership (T4) · UI (T8,T9,T10) · M0 (T12) · packaging (T13). Every spec section maps to ≥1 task. ✔
