@@ -756,11 +756,25 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 ### Task 13: Packaging and publish readiness
 
 **Files:** Create `README.md`, `README.zh-CN.md`, `LICENSE` (MIT), `THIRD_PARTY_NOTICES.md`, `SECURITY.md`, `CHANGELOG.md`, `.github/workflows/ci.yml`, `docs/compat.md`
-**Steps:**
-- [ ] READMEs: one-line install for desktop and web profiles, screenshots placeholder path, capability list, explicit v1 limits (shared cwd, no auto-pick, no persistent mainline), compat matrix (0.2.0-rc.2 verified).
-- [ ] CI: `pnpm install --frozen-lockfile && pnpm run verify`; tag-triggered `npm publish` job with `NODE_AUTH_TOKEN`.
-- [ ] `publint --strict` + `attw --pack . --profile esm-only` pass.
-- [ ] npm name availability check (`npm view dsh-canvas`) — if taken, rename to `@<scope>/dsh-canvas` and update README.
+
+**Task 13 findings (2026-10-17):**
+- **The npm name is taken.** `npm view dsh-canvas` returns `0.0.1`, described as "Infinite canvas for the DeepSeek Harness - name reserved", repository `dushaobindoudou/dsh-canvas` — i.e. the exact same product idea, name reserved. Publishing requires `@<scope>/dsh-canvas`, which means changing `package.json` `name`, the `name:` in `cordis.patch.yml`, and `PLUGIN_ID` in `tsdown.config.ts`. **The rename is deliberately NOT done here**: the loader id is part of the installed profile row, so renaming now would break the M0-verified install. Recorded as a publish blocker in both READMEs.
+- The publish job in CI is present but gated with `if: false` for the same reason — a tag push would fail at publish time, and a silently broken job is worse than an explicitly disabled one.
+- CI runs typecheck + test + build on Node 22.22.2, and asserts the lazy-CJS banner survives the build — that banner is what makes the bundle loadable by the host at all.
+- `docs/compat.md` records the verified version/commit, the exact API surface used with file:line evidence, and a **ranked list of fragile points** for whoever upgrades DSH next.
+- `SECURITY.md` states the data discipline plainly: read-only projection, no plugin storage, every retain released, one attributable retain label.
+- `THIRD_PARTY_NOTICES.md` records that the package bundles no third-party runtime code; React and cordis are host-provided peers.
+- `CHANGELOG.md` leads with the three bugs that would have shipped silently (wrong-child fork recovery, non-existent cut seq, stale `file:` copy).
+
+**Note on the SDD ledger:** `.superpowers/` is gitignored (0 files tracked), so the ledger is a local working artifact. Everything durable from it — every contract correction with its file:line evidence — is written into this plan file, which *is* tracked. That is deliberate: the knowledge must survive a clone even though the scratch ledger does not.
+
+- [ ] Run `pnpm verify` (typecheck+test+build). **Done: 167 tests green, typecheck clean, 76.23 kB / 21.47 kB gzip.**
+- [ ] Install into the **web** profile and walk the 12 M0 gates. **Partially done** — see `docs/superpowers/m0-verification.md`: gate 1 passes at the transport layer, gates 2/3/5/6/7/12 are unit-verified, gates 4/9/10 are **not run**.
+- [ ] Fix every FAIL before continuing. **Done** — the two environment blockers and the three code bugs are fixed and pinned by tests.
+- [ ] Commit the results doc: `test: M0 verification results`. **Done.**
+- [ ] READMEs / LICENSE / notices / CI / compat matrix. **Done.**
+- [ ] `publint --strict` + `attw --pack . --profile esm-only`. **Not run** — both need a network install of the tooling, and publishing is blocked on the rename anyway.
+- [ ] npm name availability check. **Done, and it failed** — see above.
 - [ ] Commit: `chore: packaging, docs, and publish pipeline`.
 
 ---

@@ -1,0 +1,61 @@
+# Compatibility
+
+## Verified against
+
+| Item | Value |
+|---|---|
+| DSH version | `0.2.0-rc.2` |
+| DSH commit | `639ed01539` |
+| Local checkout | `D:/deepseek harness` |
+| Kernel (desktop) | `0.2.0-rc.2` |
+| Node | `>=22.19.0` (tested on 22.22.2) |
+| Profile used for verification | `web-0.1.7` |
+
+Every DSH API this plugin calls was read out of that checkout. The file and line
+each behaviour was verified against is recorded in
+[`docs/superpowers/plans/2026-10-15-dsh-canvas-implementation.md`](superpowers/plans/2026-10-15-dsh-canvas-implementation.md)
+under the relevant task's "corrections" block, and in the SDD ledger.
+
+## Surface this plugin depends on
+
+| Need | API | Source |
+|---|---|---|
+| Register the tab | `ctx.slots.inject('conversation.view', …)` / `ctx.slots.register({ id: 'canvas', order: 20 }, …)` | `client/ui-trajectory/src/client/index.ts:79-112` |
+| Injected services | `slots, sessions, workspaces, uiWorkspace, uiConversation, locale` | `ui-trajectory:41` |
+| Session list | `ctx.sessions.list.getSnapshot()` → `{ ids, byId, phase }` | `api/session-controller/src/client/sessions/service.ts:54-63` |
+| Workspace list | `ctx.workspaces.list.getSnapshot()` → `{ items, archivedSessionIds, pinnedSessionIds, state, phase }` | `api/workspace-controller/src/client/model.ts:32-41` |
+| Fork at a cut | `ctx.sessions.fork({ sessionId, atSeq, increaseTitle, onCreated })` | `client/contract/sessions.ts:132-137` |
+| Retain / one-shot read | `ctx.sessions.retain(id, { source })` → `{ binding, ready, release }` | `client/contract/sessions.ts:24-33` |
+| Prompt | `binding.session.prompt(content, mode, signal?, requestId?)` — **requestId is 4th** | `client/contract/session.ts:87-92` |
+| Raw events | `binding.eventSource.getSnapshot().entries` (`{ type: 'event', event }`) | `client/contract/events.ts:23-25,109-117` |
+| Open a session | `ctx.uiWorkspace.openSession(target)` | `client/ui-workspace/src/client/navigation.ts:34` |
+
+## Fragile points
+
+These are the places where a DSH upgrade is most likely to break the plugin, in
+rough order of risk:
+
+1. **`prompt()`'s parameter order.** `requestId` is the fourth argument, after
+   `signal`. Passing it third silently lands it in `signal`, which drops it and
+   disables the Host's prompt dedupe with no visible error.
+2. **`prompt()` returns a `RemoteResult`** and does not reject on a business
+   error. Code that only catches rejections reads a refused prompt as success.
+3. **`inheritedEventCount = boundary + 1`** for an inclusive cut. An off-by-one
+   here silently changes what "compare only the new work" means.
+4. **`uiConversation.binding()` throws** for an unknown or inactive session, so
+   it may only be called after a retain has made the session current.
+5. **`ctx.uiWorkspace` and `SessionReferenceSource` have no type augmentation
+   here** because the two `@deepseek-ai/dsh-api-*` packages are not dependencies.
+   Both are cast at the boundary in `src/client/index.ts`.
+6. **The client list row carries neither `createdAt` nor an availability flag.**
+   `createdAt` falls back to `updatedAt`, so root ordering is activity-based;
+   `available` is always true, which leaves the `failed` status reachable only
+   from an explicit error channel.
+7. **`sessionIds` is an accounting list** and can lag a just-created session, so
+   workspace membership is the union of `sessionIds` and a `cwd === path` match.
+
+## Not verified
+
+Gates that need an interactive browser or a real session corpus are listed with
+an explicit status in [`m0-verification.md`](m0-verification.md). Gates 4, 9, and
+10 have **not** been run.

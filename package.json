@@ -11,7 +11,7 @@
     "./client": { "types": "./lib/types/client/index.d.ts", "default": "./lib/client.js" },
     "./package.json": "./package.json"
   },
-  "files": ["lib", "cordis.patch.yml", "README.md", "README.zh-CN.md", "THIRD_PARTY_NOTICES.md", "SECURITY.md", "LICENSE"],
+  "files": ["lib", "cordis.patch.yml", "README.md", "README.zh-CN.md", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md", "SECURITY.md", "LICENSE"],
   "dsh": {
     "bundle": { "patch": "./cordis.patch.yml" },
     "client": {
