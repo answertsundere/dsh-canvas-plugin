@@ -6,8 +6,9 @@ import { selectWorkspaceSummaries, toWorkspaceItems } from '../adapters/workspac
 import { deriveStatus, type RuntimeHint } from '../adapters/runtime-status-adapter.ts'
 import { inheritedPrefixLength, segmentFromEvents, type SessionEventLike } from '../compare/branch-segment.ts'
 import { compareBranches } from '../compare/diff.ts'
+import { parallelWriteIds } from '../graph/parallel-write.ts'
 import { runForkTransaction, type ForkDeps, type ForkResult } from './fork-controller.ts'
-import { IDENTITY_VIEW, type CanvasModel, type CanvasView } from '../ui/canvas-model.ts'
+import { IDENTITY_VIEW, type CanvasDetail, type CanvasModel, type CanvasView } from '../ui/canvas-model.ts'
 
 /**
  * Everything the controller needs from DSH, expressed structurally so tests
@@ -159,6 +160,29 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
     }
   }
 
+  /**
+   * One node's own turns for the detail panel.
+   *
+   * The read is one-shot — `readEvents` retains, reads, and releases — so
+   * selecting a different node has nothing to clean up and a forgotten release
+   * cannot pin a Session open. v1 therefore shows a snapshot of the branch, not a
+   * live-updating one.
+   */
+  const detail = async (id: SessionId): Promise<CanvasDetail | null> => {
+    try {
+      const events = await deps.readEvents(id)
+      const inheritedCount = inheritedPrefixLength(events)
+      return {
+        sessionId: id,
+        turns: segmentFromEvents(id, inheritedCount, events).turns,
+        inheritedCount,
+        cwdWarning: parallelWriteIds(graph).has(id),
+      }
+    } catch {
+      return null
+    }
+  }
+
   const model = (): CanvasModel => ({
     get graph() { return graph },
     statusOf: id => statuses.get(id) ?? UNKNOWN,
@@ -173,6 +197,15 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
     subscribe: listener => {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
+    },
+    detail,
+    comparison: compare,
+    forkFromRow,
+    openInChat,
+    clearSelection: () => {
+      if (selectedId === undefined) return
+      selectedId = undefined
+      notify()
     },
   })
 

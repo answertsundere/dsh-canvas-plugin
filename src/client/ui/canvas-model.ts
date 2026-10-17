@@ -1,4 +1,4 @@
-import type { CanvasGraph } from '../../shared/contracts.ts'
+import type { BranchTurn, CanvasGraph, ComparisonResult, LaunchMode } from '../../shared/contracts.ts'
 import type { StatusBadge } from '../../shared/status.ts'
 
 /**
@@ -13,6 +13,16 @@ export interface CanvasView {
   readonly x: number
   readonly y: number
   readonly scale: number
+}
+
+/** One node's own turns, for the detail panel. */
+export interface CanvasDetail {
+  readonly sessionId: string
+  readonly turns: readonly BranchTurn[]
+  /** Events this session inherited from its own fork point. */
+  readonly inheritedCount: number
+  /** Another running session shares this directory. */
+  readonly cwdWarning: boolean
 }
 
 export interface CanvasModel {
@@ -36,6 +46,24 @@ export interface CanvasModel {
    * what keeps the canvas live. Tests can omit it and pass plain values.
    */
   subscribe?(listener: () => void): () => void
+  /** Loads a node's turns. Absent → the tab shows no detail panel. */
+  detail?(id: string): Promise<CanvasDetail | null>
+  /** Loads the comparison for the two picked branches. */
+  comparison?(): Promise<ComparisonResult | null>
+  /** Runs a fork from a timeline row. */
+  forkFromRow?(sessionId: string, atSeq: number, instruction: string, launch: LaunchMode): Promise<ForkOutcome>
+  /** Switches the app to a session. */
+  openInChat?(id: string): void
+  /** Drops the selection, which closes the right panel. */
+  clearSelection?(): void
+}
+
+/** The subset of `ForkResult` the tab shows. */
+export interface ForkOutcome {
+  readonly childId: string
+  readonly phase: string
+  readonly error?: string
+  readonly retriedPrompt: boolean
 }
 
 export const IDENTITY_VIEW: CanvasView = { x: 0, y: 0, scale: 1 }

@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { apply, inject } from '../src/client/index.ts'
 import { CanvasTab } from '../src/client/ui/CanvasTab.tsx'
-import type { CanvasModel } from '../src/client/ui/canvas-model.ts'
+import type { CanvasDetail, CanvasModel } from '../src/client/ui/canvas-model.ts'
 import { badge } from '../src/shared/status.ts'
 import type { CanvasGraph, CanvasNode } from '../src/shared/contracts.ts'
 
@@ -225,5 +225,150 @@ describe('CanvasTab', () => {
   it('draws one edge per non-root node', () => {
     const { container } = render(<CanvasTab canvas={model()} />)
     expect(container.querySelectorAll('[data-canvas-edges] path')).toHaveLength(1)
+  })
+
+  it('opens a node in the conversation on double click', () => {
+    const openInChat = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({ openInChat })} />)
+    fireEvent.doubleClick(container.querySelector('[data-canvas-node="b"]') as Element)
+    expect(openInChat).toHaveBeenCalledWith('b')
+  })
+})
+
+const detailOf = (over: Partial<CanvasDetail> = {}): CanvasDetail => ({
+  sessionId: 'b',
+  turns: [
+    { index: 0, firstSeq: 10, lastSeq: 14, userMessage: '问一句', tools: [], synthetic: false, endedAs: 'completed' },
+  ],
+  inheritedCount: 3,
+  cwdWarning: false,
+  ...over,
+})
+
+describe('CanvasTab right panel', () => {
+  it('stays closed until a node is selected', () => {
+    const { container } = render(<CanvasTab canvas={model()} />)
+    expect(container.querySelector('[data-right-panel]')).toBeNull()
+  })
+
+  it('loads the selected node\u2019s turns into the detail timeline', async () => {
+    const detail = vi.fn(async () => detailOf())
+    const { container } = render(<CanvasTab canvas={model({ selectedId: 'b', detail })} />)
+    expect(container.querySelector('[data-right-panel]')).not.toBeNull()
+    await waitFor(() => expect(container.querySelectorAll('[data-timeline-row]')).toHaveLength(1))
+    expect(detail).toHaveBeenCalledWith('b')
+    expect(container.querySelector('[data-timeline-inherited]')?.textContent).toContain('3')
+  })
+
+  it('closes through clearSelection', () => {
+    const clearSelection = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({ selectedId: 'b', clearSelection })} />)
+    fireEvent.click(container.querySelector('[data-panel-close]') as Element)
+    expect(clearSelection).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the fork dialog at the row\u2019s own cut and runs the transaction', async () => {
+    const forkFromRow = vi.fn(async () => ({ childId: 'child', phase: 'done', retriedPrompt: false }))
+    const { container } = render(
+      <CanvasTab canvas={model({ selectedId: 'b', detail: async () => detailOf(), forkFromRow })} />,
+    )
+    await waitFor(() => expect(container.querySelector('[data-fork-row="0"]')).not.toBeNull())
+    fireEvent.click(container.querySelector('[data-fork-row="0"]') as Element)
+
+    // The cut is the row's own last seq — always a real event seq.
+    expect(container.querySelector('[data-fork-cut]')?.textContent).toContain('seq 14')
+    fireEvent.change(container.querySelector('[data-fork-instruction]') as Element, {
+      target: { value: '换条路' },
+    })
+    fireEvent.click(container.querySelector('[data-fork-confirm]') as Element)
+
+    await waitFor(() => expect(forkFromRow).toHaveBeenCalledWith('b', 14, '换条路', 'now'))
+    await waitFor(() => expect(container.querySelector('[data-fork-dialog]')).toBeNull())
+  })
+
+  it('keeps the dialog open and reports a failed fork', async () => {
+    const forkFromRow = vi.fn(async () => ({
+      childId: '', phase: 'failed', error: '目标会话不存在', retriedPrompt: false,
+    }))
+    const { container } = render(
+      <CanvasTab canvas={model({ selectedId: 'b', detail: async () => detailOf(), forkFromRow })} />,
+    )
+    await waitFor(() => expect(container.querySelector('[data-fork-row="0"]')).not.toBeNull())
+    fireEvent.click(container.querySelector('[data-fork-row="0"]') as Element)
+    fireEvent.change(container.querySelector('[data-fork-instruction]') as Element, { target: { value: 'go' } })
+    fireEvent.click(container.querySelector('[data-fork-confirm]') as Element)
+
+    await waitFor(() => expect(container.querySelector('[data-fork-error]')?.textContent).toBe('目标会话不存在'))
+    expect(container.querySelector('[data-fork-dialog]')).not.toBeNull()
+  })
+
+  it('tells the user when a fork is unverified rather than calling it a failure', async () => {
+    // The child may exist; saying "failed" would invite a second fork.
+    const forkFromRow = vi.fn(async () => ({ childId: '', phase: 'unverified', retriedPrompt: false }))
+    const { container } = render(
+      <CanvasTab canvas={model({ selectedId: 'b', detail: async () => detailOf(), forkFromRow })} />,
+    )
+    await waitFor(() => expect(container.querySelector('[data-fork-row="0"]')).not.toBeNull())
+    fireEvent.click(container.querySelector('[data-fork-row="0"]') as Element)
+    fireEvent.change(container.querySelector('[data-fork-instruction]') as Element, { target: { value: 'go' } })
+    fireEvent.click(container.querySelector('[data-fork-confirm]') as Element)
+    await waitFor(() => expect(container.querySelector('[data-fork-error]')?.textContent).toContain('可能已创建'))
+  })
+
+  it('loads the comparison when the compare tab is opened', async () => {
+    const comparison = vi.fn(async () => null)
+    const { container } = render(
+      <CanvasTab canvas={model({
+        selectedId: 'b', compareIds: ['a', 'b'],
+        detail: async () => detailOf(), comparison,
+      })} />,
+    )
+    fireEvent.click(container.querySelector('[data-panel-tab="compare"]') as Element)
+    await waitFor(() => expect(comparison).toHaveBeenCalledTimes(1))
+    expect(container.querySelector('[data-compare-empty]')).not.toBeNull()
+  })
+
+  it('switches to the chosen branch on 择优继续', async () => {
+    const onSelect = vi.fn()
+    const result = {
+      a: { sessionId: 'a', inheritedCount: 0, turns: [] },
+      b: { sessionId: 'b', inheritedCount: 0, turns: [] },
+      turnDiffs: [],
+      toolCountDiff: 0,
+      bothFailed: false,
+      lastConclusion: { side: 'none' as const, text: '' },
+    }
+    const { container } = render(
+      <CanvasTab canvas={model({
+        selectedId: 'b', compareIds: ['a', 'b'], onSelect,
+        detail: async () => detailOf(), comparison: async () => result,
+      })} />,
+    )
+    fireEvent.click(container.querySelector('[data-panel-tab="compare"]') as Element)
+    await waitFor(() => expect(container.querySelector('[data-compare-panel]')).not.toBeNull())
+    fireEvent.click(container.querySelector('[data-continue="b"]') as Element)
+    expect(onSelect).toHaveBeenCalledWith('b')
+  })
+
+  it('hands a carried draft to the clipboard path and confirms it', async () => {
+    const result = {
+      a: { sessionId: 'a', inheritedCount: 0, turns: [] },
+      b: { sessionId: 'b', inheritedCount: 0, turns: [] },
+      turnDiffs: [],
+      toolCountDiff: 0,
+      bothFailed: false,
+      lastConclusion: { side: 'none' as const, text: '' },
+    }
+    const { container } = render(
+      <CanvasTab canvas={model({
+        selectedId: 'b', compareIds: ['a', 'b'],
+        detail: async () => detailOf(), comparison: async () => result,
+      })} />,
+    )
+    fireEvent.click(container.querySelector('[data-panel-tab="compare"]') as Element)
+    await waitFor(() => expect(container.querySelector('[data-carry="a"]')).not.toBeNull())
+    fireEvent.click(container.querySelector('[data-carry="a"]') as Element)
+    fireEvent.click(container.querySelector('[data-carry-send]') as Element)
+    await waitFor(() => expect(container.querySelector('[data-carry-done]')).not.toBeNull())
   })
 })

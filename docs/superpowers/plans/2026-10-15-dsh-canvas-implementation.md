@@ -731,7 +731,13 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 - [ ] **Step 1: Failing tests** for the controller with a fake: graph built from workspace members and out-of-workspace sessions excluded; per-node status including `unknown` on disconnect; selection through the model getters; compare toggling with the oldest pick dropping on a third; search locating the first match; `openInChat` delegation; selections dropped when they leave the workspace; subscriber notification; `forkFromRow` running the transaction and refreshing; `compare()` null below two picks and on an unreadable read; `compare()` honouring each side's inherited prefix. Plus `inheritedPrefixLength` (marker at the cut, last marker wins, untagged markers ignored, never-forked is zero) and an integration test that `apply` injects a **live** controller model, not a placeholder.
 - [ ] **Step 2: implement → 4: PASS; commit** `feat: wire controllers and panels into the canvas tab`
-- [ ] **Step 3 (outstanding):** mount `RightPanel`/`BranchTimeline`/`ForkDialog`/`ComparePanel` inside `CanvasTab`. The components exist and are tested; the tab currently renders the canvas and toolbar only. This needs an async timeline loader on the model (retain on selection, release on change) and a compare-result loader.
+- [ ] **Step 3: mount the panels inside `CanvasTab`.** `RightPanel` + `BranchTimeline` (detail), `ComparePanel` (compare tab), `ForkDialog` (over the panel body). The model gained `detail(id)`, `comparison()`, `forkFromRow(...)`, `openInChat(id)` and `clearSelection()`; each is optional, so a tab without them still renders the canvas alone.
+  - The detail read is **one-shot** (`readEvents` retains, reads, releases), so selecting another node has nothing to leak and there is no `closeDetail`. v1 therefore shows a snapshot of the branch, not a live-updating one.
+  - `unverified` is surfaced as 「分支可能已创建，但无法确认」 and the dialog stays open — calling it a failure would invite exactly the second fork the transaction exists to prevent.
+  - v1 has no composer handle, so 带回结论 copies the draft to the clipboard and confirms it. It still never submits anything.
+  - Double-clicking a node opens it in the conversation (`openInChat`), which is what makes `openInChat` reachable from the UI.
+  - `parallelWriteIds` moved to `graph/parallel-write.ts` so the badge and the detail panel's `cwdWarning` share one rule instead of two copies.
+- [ ] **Step 4: commit** `feat: mount the detail, compare, and fork panels in the canvas tab`
 
 ---
 

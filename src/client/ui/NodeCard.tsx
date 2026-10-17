@@ -18,10 +18,12 @@ export interface NodeCardProps {
   readonly highlight: boolean
   readonly now: number
   onClick(event: MouseEvent<HTMLDivElement>, id: string): void
+  /** Opens the session in the conversation view. */
+  onOpen?(id: string): void
 }
 
 export const NodeCard: FC<NodeCardProps> = ({
-  node, status, position, width, height, selected, comparing, parallelWrite, highlight, now, onClick,
+  node, status, position, width, height, selected, comparing, parallelWrite, highlight, now, onClick, onOpen,
 }) => (
   <div
     data-canvas-node={node.id}
@@ -29,6 +31,7 @@ export const NodeCard: FC<NodeCardProps> = ({
     data-comparing={comparing ? 'true' : 'false'}
     data-highlight={highlight ? 'true' : 'false'}
     onClick={event => onClick(event, node.id)}
+    onDoubleClick={event => { event.stopPropagation(); onOpen?.(node.id) }}
     style={{
       position: 'absolute',
       left: position.x,

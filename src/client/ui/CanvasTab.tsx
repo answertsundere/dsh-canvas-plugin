@@ -2,11 +2,16 @@ import {
   useEffect, useReducer, useRef, useState,
   type CSSProperties, type FC, type MouseEvent as ReactMouseEvent,
 } from 'react'
-import type { SessionId } from '../../shared/contracts.ts'
+import type { ComparisonResult, LaunchMode, SessionId } from '../../shared/contracts.ts'
 import { theme } from '../theme.ts'
 import { layoutLayered, type LayoutPoint } from '../graph/graph-layout.ts'
+import { parallelWriteIds } from '../graph/parallel-write.ts'
 import { NodeCard } from './NodeCard.tsx'
-import type { CanvasModel, CanvasView } from './canvas-model.ts'
+import { RightPanel, type RightPanelTab } from './RightPanel.tsx'
+import { BranchTimeline, cutSeqAt } from './BranchTimeline.tsx'
+import { ForkDialog } from './ForkDialog.tsx'
+import { ComparePanel } from './ComparePanel.tsx'
+import type { CanvasDetail, CanvasModel, CanvasView } from './canvas-model.ts'
 
 export interface CanvasTabProps {
   /** Absent until the controller layer is wired in; the tab still boots. */
@@ -22,13 +27,45 @@ const FIT_VIEWPORT = { width: 1000, height: 600 }
 
 export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   const [query, setQuery] = useState('')
+  const [tab, setTab] = useState<RightPanelTab>('detail')
+  const [detail, setDetail] = useState<CanvasDetail | null>(null)
+  const [comparison, setComparison] = useState<ComparisonResult | null>(null)
+  const [fork, setFork] = useState<{ rowIndex: number; atSeq: number } | null>(null)
+  const [forkBusy, setForkBusy] = useState(false)
+  const [forkError, setForkError] = useState<string | undefined>(undefined)
+  const [carried, setCarried] = useState(false)
   const drag = useRef<{ startX: number; startY: number; viewX: number; viewY: number } | null>(null)
   const [, bump] = useReducer((tick: number) => tick + 1, 0)
+
+  const selectedId = canvas?.selectedId
+  const compareKey = canvas?.compareIds.join('\u0000') ?? ''
 
   // The slot hands the tab a single model object for its lifetime, so live
   // updates arrive through the model's own invalidation channel rather than
   // through new props.
   useEffect(() => canvas?.subscribe?.(() => { bump() }), [canvas])
+
+  // A node's turns are read once when it is selected. The read is one-shot, so
+  // switching away has nothing to release.
+  useEffect(() => {
+    setTab('detail')
+    setFork(null)
+    setForkError(undefined)
+    if (canvas?.detail === undefined || selectedId === undefined) {
+      setDetail(null)
+      return
+    }
+    let live = true
+    void canvas.detail(selectedId).then(next => { if (live) setDetail(next) })
+    return () => { live = false }
+  }, [canvas, selectedId])
+
+  useEffect(() => {
+    if (tab !== 'compare' || canvas?.comparison === undefined) return
+    let live = true
+    void canvas.comparison().then(next => { if (live) setComparison(next) })
+    return () => { live = false }
+  }, [canvas, tab, compareKey])
 
   if (canvas === undefined) {
     return (
@@ -43,9 +80,10 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   }
 
   const layout = layoutLayered(canvas.graph, { nodeWidth: NODE_WIDTH, nodeHeight: NODE_HEIGHT })
-  const parallelWrite = parallelWriteIds(canvas)
+  const parallelWrite = parallelWriteIds(canvas.graph)
   const now = Date.now()
   const needle = query.trim().toLowerCase()
+  const selectedNode = selectedId === undefined ? undefined : canvas.graph.nodes.get(selectedId)
 
   const handleNodeClick = (event: ReactMouseEvent<HTMLDivElement>, id: SessionId): void => {
     if (event.metaKey || event.ctrlKey) canvas.onToggleCompare(id)
@@ -67,6 +105,41 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
       y: (FIT_VIEWPORT.height - layout.height * scale) / 2,
       scale,
     })
+  }
+
+  const openFork = (rowIndex: number): void => {
+    const atSeq = cutSeqAt(detail?.turns ?? [], rowIndex)
+    if (atSeq === undefined) return
+    setForkError(undefined)
+    setFork({ rowIndex, atSeq })
+  }
+
+  const confirmFork = async (instruction: string, mode: LaunchMode): Promise<void> => {
+    const sessionId = detail?.sessionId
+    if (sessionId === undefined || fork === null || canvas.forkFromRow === undefined) return
+    setForkBusy(true)
+    setForkError(undefined)
+    const outcome = await canvas.forkFromRow(sessionId, fork.atSeq, instruction, mode)
+    setForkBusy(false)
+    if (outcome.phase === 'done') {
+      setFork(null)
+      return
+    }
+    // `unverified` is not a failure — the child may exist. Saying so is the whole
+    // reason the phase is kept separate from `failed`.
+    setForkError(outcome.error ?? (outcome.phase === 'unverified'
+      ? '分支可能已创建，但无法确认，请刷新后检查'
+      : '分支创建失败'))
+  }
+
+  const carry = (draft: string): void => {
+    // v1 has no composer handle, so the draft goes to the clipboard rather than
+    // being submitted anywhere. The user still ends up with the text.
+    const clipboard = (globalThis as {
+      navigator?: { clipboard?: { writeText(text: string): Promise<void> } }
+    }).navigator?.clipboard
+    void clipboard?.writeText(draft)
+    setCarried(true)
   }
 
   return (
@@ -103,99 +176,122 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
         )}
       </div>
 
-      <div
-        data-canvas-surface
-        onMouseDown={event => {
-          drag.current = {
-            startX: event.clientX, startY: event.clientY,
-            viewX: canvas.view.x, viewY: canvas.view.y,
-          }
-        }}
-        onMouseMove={event => {
-          const started = drag.current
-          if (started === null) return
-          canvas.onViewChange({
-            x: started.viewX + (event.clientX - started.startX),
-            y: started.viewY + (event.clientY - started.startY),
-            scale: canvas.view.scale,
-          })
-        }}
-        onMouseUp={() => { drag.current = null }}
-        onMouseLeave={() => { drag.current = null }}
-        onWheel={event => {
-          const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1
-          canvas.onViewChange({ ...canvas.view, scale: clamp(canvas.view.scale * factor, MIN_SCALE, MAX_SCALE) })
-        }}
-        style={{ position: 'relative', flex: '1 1 auto', overflow: 'hidden', cursor: 'grab' }}
-      >
+      <div style={{ display: 'flex', flex: '1 1 auto', minHeight: 0 }}>
         <div
-          data-canvas-plane
-          style={{
-            position: 'absolute',
-            inset: 0,
-            transform: `translate(${canvas.view.x}px, ${canvas.view.y}px) scale(${canvas.view.scale})`,
-            transformOrigin: '0 0',
+          data-canvas-surface
+          onMouseDown={event => {
+            drag.current = {
+              startX: event.clientX, startY: event.clientY,
+              viewX: canvas.view.x, viewY: canvas.view.y,
+            }
           }}
+          onMouseMove={event => {
+            const started = drag.current
+            if (started === null) return
+            canvas.onViewChange({
+              x: started.viewX + (event.clientX - started.startX),
+              y: started.viewY + (event.clientY - started.startY),
+              scale: canvas.view.scale,
+            })
+          }}
+          onMouseUp={() => { drag.current = null }}
+          onMouseLeave={() => { drag.current = null }}
+          onWheel={event => {
+            const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1
+            canvas.onViewChange({ ...canvas.view, scale: clamp(canvas.view.scale * factor, MIN_SCALE, MAX_SCALE) })
+          }}
+          style={{ position: 'relative', flex: '1 1 auto', overflow: 'hidden', cursor: 'grab' }}
         >
-          <svg
-            data-canvas-edges
-            width={Math.max(layout.width, 1)}
-            height={Math.max(layout.height, 1)}
-            style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}
+          <div
+            data-canvas-plane
+            style={{
+              position: 'absolute',
+              inset: 0,
+              transform: `translate(${canvas.view.x}px, ${canvas.view.y}px) scale(${canvas.view.scale})`,
+              transformOrigin: '0 0',
+            }}
           >
-            {edgePaths(canvas, layout.positions).map(edge => (
-              <path
-                key={`${edge.from}->${edge.to}`}
-                d={edge.d}
-                fill="none"
-                stroke={edge.active ? theme.accent : theme.border}
-                strokeWidth={1.5}
+            <svg
+              data-canvas-edges
+              width={Math.max(layout.width, 1)}
+              height={Math.max(layout.height, 1)}
+              style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}
+            >
+              {edgePaths(canvas, layout.positions).map(edge => (
+                <path
+                  key={`${edge.from}->${edge.to}`}
+                  d={edge.d}
+                  fill="none"
+                  stroke={edge.active ? theme.accent : theme.border}
+                  strokeWidth={1.5}
+                />
+              ))}
+            </svg>
+
+            {[...canvas.graph.nodes.values()].map(node => (
+              <NodeCard
+                key={node.id}
+                node={node}
+                status={canvas.statusOf(node.id)}
+                position={layout.positions.get(node.id) ?? { x: 0, y: 0 }}
+                width={NODE_WIDTH}
+                height={NODE_HEIGHT}
+                selected={canvas.selectedId === node.id}
+                comparing={canvas.compareIds.includes(node.id)}
+                parallelWrite={parallelWrite.has(node.id)}
+                highlight={needle !== '' && matches(node.title, node.id, needle)}
+                now={now}
+                onClick={handleNodeClick}
+                onOpen={id => canvas.openInChat?.(id)}
               />
             ))}
-          </svg>
-
-          {[...canvas.graph.nodes.values()].map(node => (
-            <NodeCard
-              key={node.id}
-              node={node}
-              status={canvas.statusOf(node.id)}
-              position={layout.positions.get(node.id) ?? { x: 0, y: 0 }}
-              width={NODE_WIDTH}
-              height={NODE_HEIGHT}
-              selected={canvas.selectedId === node.id}
-              comparing={canvas.compareIds.includes(node.id)}
-              parallelWrite={parallelWrite.has(node.id)}
-              highlight={needle !== '' && matches(node.title, node.id, needle)}
-              now={now}
-              onClick={handleNodeClick}
-            />
-          ))}
+          </div>
         </div>
+
+        {selectedId !== undefined && (
+          <RightPanel
+            tab={tab}
+            title={selectedNode?.title}
+            onTabChange={setTab}
+            onClose={() => canvas.clearSelection?.()}
+          >
+            {tab === 'detail' ? (
+              <BranchTimeline
+                turns={detail?.turns ?? []}
+                inheritedCount={detail?.inheritedCount ?? 0}
+                cwdWarning={detail?.cwdWarning ?? false}
+                onFork={openFork}
+              />
+            ) : (
+              <>
+                <ComparePanel
+                  result={comparison}
+                  onContinue={side => {
+                    const id = canvas.compareIds[side === 'a' ? 0 : 1]
+                    if (id !== undefined) canvas.onSelect(id)
+                  }}
+                  onCarry={(_side, draft) => { carry(draft) }}
+                />
+                {carried && (
+                  <div data-carry-done style={{ color: theme.accent, padding: '0 10px 10px' }}>已复制到剪贴板</div>
+                )}
+              </>
+            )}
+
+            <ForkDialog
+              open={fork !== null}
+              atSeq={fork?.atSeq ?? 0}
+              inheritedCount={detail?.inheritedCount ?? 0}
+              busy={forkBusy}
+              {...(forkError === undefined ? {} : { error: forkError })}
+              onCancel={() => { setFork(null); setForkError(undefined) }}
+              onConfirm={(instruction, mode) => { void confirmFork(instruction, mode) }}
+            />
+          </RightPanel>
+        )}
       </div>
     </div>
   )
-}
-
-/**
- * A node is flagged when a *different* running session shares its directory —
- * i.e. someone else may be writing the same files. A node that is the only
- * running session in its directory has nobody to collide with, so it is not
- * flagged; an idle node in a directory someone else is writing *is*, because
- * forking it would put a second writer there.
- */
-function parallelWriteIds(canvas: CanvasModel): Set<SessionId> {
-  const runningByCwd = new Map<string, number>()
-  for (const node of canvas.graph.nodes.values()) {
-    if (!node.running || node.cwd === null) continue
-    runningByCwd.set(node.cwd, (runningByCwd.get(node.cwd) ?? 0) + 1)
-  }
-  const flagged = new Set<SessionId>()
-  for (const node of canvas.graph.nodes.values()) {
-    if (node.cwd === null) continue
-    const others = (runningByCwd.get(node.cwd) ?? 0) - (node.running ? 1 : 0)
-    if (others > 0) flagged.add(node.id)
-  }
-  return flagged
 }
 
 function edgePaths(canvas: CanvasModel, positions: ReadonlyMap<SessionId, LayoutPoint>) {
