@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type FC } from 'react'
 import type { AgentSwarmState } from '../controllers/agent-swarm-controller.ts'
 import {
   anchoredPan,
+  collapseTools,
   fitScale,
   paletteAccent,
   pulseProgress,
@@ -411,7 +412,26 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                   </g>
                 )
               })}
-              {tools.map((tool, toolIndex) => {
+              {(swarm.team?.tasks ?? [])
+                .filter(task => task.status === 'in_progress')
+                .map(task => {
+                  const owner = agents.find(agent => agent.label === task.ownerName)
+                  if (owner === undefined) return null
+                  const to = positionOf(owner.id)
+                  return (
+                    <line
+                      key={`assign->${owner.id}`}
+                      data-swarm-assign-edge={owner.id}
+                      x1={0} y1={0} x2={to.x} y2={to.y}
+                      stroke={theme.warn}
+                      strokeWidth={1.4}
+                      strokeDasharray="2 5"
+                      opacity={0.8}
+                    />
+                  )
+                })}
+              {collapseTools(tools).map((group, toolIndex) => {
+                const tool = group.tool
                 const to = toolPositionOf(tool.id)
                 const heatAt = swarm.heat.get(`tool:${tool.id}`)
                 const progress = heatAt === undefined ? null : pulseProgress(heatAt, now)
@@ -502,7 +522,8 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
             )
           })}
 
-          {tools.map(tool => {
+          {collapseTools(tools).map(group => {
+            const tool = group.tool
             const p = toolPositionOf(tool.id)
             const pending = tool.status === 'pending'
             const failed = tool.status === 'error'
@@ -540,6 +561,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, nowMs 
                 />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {tool.name}
+                  {group.count > 1 && <span data-swarm-tool-count> ×{group.count}</span>}
                   {tool.preview !== undefined && (
                     <span style={{ color: theme.muted }}> {tool.preview}</span>
                   )}

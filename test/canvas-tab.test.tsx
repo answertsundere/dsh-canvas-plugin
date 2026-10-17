@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { apply, inject } from '../src/client/index.ts'
 import { CanvasTab } from '../src/client/ui/CanvasTab.tsx'
-import type { CanvasDetail, CanvasModel } from '../src/client/ui/canvas-model.ts'
+import type { CanvasDetail, CanvasModel, CanvasView } from '../src/client/ui/canvas-model.ts'
 import type { LiveTail } from '../src/client/live/live-tail.ts'
 import { badge } from '../src/shared/status.ts'
 import type { CanvasGraph, CanvasNode } from '../src/shared/contracts.ts'
@@ -577,5 +577,21 @@ describe('drag threshold', () => {
     render(<CanvasTab canvas={model({ onSelect })} />)
     fireEvent.click(document.querySelector('[data-canvas-node="a"]') as Element)
     expect(onSelect).toHaveBeenCalledWith('a')
+  })
+})
+describe('minimap', () => {
+  it('renders a corner overview with one dot per node and recenters on click', () => {
+    const onViewChange = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({ onViewChange })} />)
+    onViewChange.mockClear()
+    const minimap = container.querySelector('[data-canvas-minimap]')
+    expect(minimap).not.toBeNull()
+    expect(minimap?.querySelectorAll('[data-minimap-node]')).toHaveLength(2)
+    fireEvent.click(minimap as Element, { clientX: 60, clientY: 40 })
+    expect(onViewChange).toHaveBeenCalledTimes(1)
+    const view = onViewChange.mock.calls[0]?.[0] as CanvasView
+    expect(typeof view.x).toBe('number')
+    expect(typeof view.y).toBe('number')
+    expect(view.scale).toBe(1)
   })
 })

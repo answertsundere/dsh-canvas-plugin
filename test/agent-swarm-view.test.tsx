@@ -314,3 +314,35 @@ describe('tool previews and busy owners', () => {
 
   function themeWarn(): string { return '#e0a23c' }
 })
+
+describe('tool collapse and assignment edges', () => {
+  it('consecutive same-name tools fold into one chip with a count badge', () => {
+    const state = activityState({
+      activity: {
+        turnCount: 0, openTurn: true, currentTurn: 0,
+        tools: [
+          { id: 'c1', name: 'send_message', status: 'ok', turn: 0 },
+          { id: 'c2', name: 'send_message', status: 'ok', turn: 0 },
+          { id: 'c3', name: 'send_message', status: 'ok', turn: 0 },
+          { id: 'c4', name: 'read', status: 'ok', turn: 0 },
+        ],
+        pendingToolId: null,
+      },
+      toolLayout: { maxRadius: 400, positions: new Map([['c3', { x: 0, y: -300 }], ['c4', { x: 200, y: -200 }]]) },
+    })
+    const { container } = render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(container.querySelectorAll('[data-swarm-tool]')).toHaveLength(2)
+    expect(document.querySelector('[data-swarm-tool="c3"] [data-swarm-tool-count]')?.textContent).toContain('×3')
+  })
+
+  it('an in-progress task draws an assignment thread to its owner', () => {
+    const state = activityState({
+      team: {
+        members: [{ id: 'root', name: 'lead', role: 'lead', phase: 'active' }],
+        tasks: [{ id: 't1', subject: '写接口', status: 'in_progress', ownerName: '检索器' }],
+      },
+    })
+    const { container } = render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(container.querySelector('[data-swarm-assign-edge="a"]')).not.toBeNull()
+  })
+})

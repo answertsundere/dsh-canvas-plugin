@@ -523,3 +523,29 @@ export function anchoredPan(
     y: cursor.y - center.y - contentY * newScale,
   }
 }
+
+/** One ring chip after collapsing consecutive same-name tools. */
+export interface CollapsedTool {
+  /** The most recent tool of the run — its id, status and preview represent the chip. */
+  readonly tool: ActivityTool
+  readonly count: number
+}
+
+/**
+ * Collapse CONSECUTIVE same-name tools into one chip with a ×N badge — a
+ * teammate that fired send_message four times in a row is one job done four
+ * times, not four chips of clutter. Non-consecutive same-name tools stay
+ * separate: their positions tell the order, and merging them would lie.
+ */
+export function collapseTools(tools: readonly ActivityTool[]): CollapsedTool[] {
+  const collapsed: CollapsedTool[] = []
+  for (const tool of tools) {
+    const last = collapsed[collapsed.length - 1]
+    if (last !== undefined && last.tool.name === tool.name && last.tool.status === tool.status) {
+      collapsed[collapsed.length - 1] = { tool, count: last.count + 1 }
+    } else {
+      collapsed.push({ tool, count: 1 })
+    }
+  }
+  return collapsed
+}

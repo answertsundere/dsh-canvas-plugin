@@ -407,3 +407,29 @@ describe('activityFromEntries previews', () => {
     expect(activity.tools[0]?.preview?.endsWith('…')).toBe(true)
   })
 })
+
+import { collapseTools } from '../src/client/swarm/swarm-model.ts'
+
+describe('collapseTools', () => {
+  const t = (id: string, name: string, status: 'pending' | 'ok' | 'error' = 'ok'): { id: string; name: string; status: 'ok' | 'pending' | 'error'; turn: number; id2?: never } =>
+    ({ id, name, status, turn: 0 }) as never
+
+  it('folds consecutive same-name tools into one chip with a count', () => {
+    const collapsed = collapseTools([
+      t('c1', 'send_message'), t('c2', 'send_message'), t('c3', 'send_message'), t('c4', 'read'),
+    ])
+    expect(collapsed.map(group => `${group.tool.name}×${group.count}`)).toEqual(['send_message×3', 'read×1'])
+    // The representative is the most recent of the run.
+    expect(collapsed[0]?.tool.id).toBe('c3')
+  })
+
+  it('a status change breaks the run', () => {
+    const collapsed = collapseTools([t('c1', 'pwsh', 'error'), t('c2', 'pwsh')])
+    expect(collapsed.map(group => `${group.tool.name}×${group.count}`)).toEqual(['pwsh×1', 'pwsh×1'])
+  })
+
+  it('non-consecutive same-name tools stay separate', () => {
+    const collapsed = collapseTools([t('c1', 'read'), t('c2', 'write'), t('c3', 'read')])
+    expect(collapsed).toHaveLength(3)
+  })
+})

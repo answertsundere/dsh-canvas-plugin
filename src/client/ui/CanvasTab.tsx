@@ -75,6 +75,69 @@ const CANVAS_CSS = `
 .dsh-robot-v-read.dsh-robot-idle .dsh-robot-eye { animation: dshIdleGlint 4.2s ease-in-out infinite; }
 `
 
+/**
+ * Corner overview: every node as a status dot, the current viewport as a
+ * frame, and a click that recenters the view on the chosen spot.
+ */
+const MiniMap: FC<{
+  readonly canvas: CanvasModel
+  readonly layout: { width: number; height: number; positions: ReadonlyMap<SessionId, LayoutPoint> }
+  onViewChange(view: CanvasView): void
+}> = ({ canvas, layout, onViewChange }) => {
+  const BOX = { width: 148, height: 96, pad: 6 }
+  const scale = Math.min(
+    BOX.width / Math.max(layout.width, 1),
+    BOX.height / Math.max(layout.height, 1),
+  )
+  const viewportWidth = Math.max((FIT_VIEWPORT.width / canvas.view.scale) * scale, 10)
+  const viewportHeight = Math.max((FIT_VIEWPORT.height / canvas.view.scale) * scale, 10)
+  const viewportX = BOX.pad - canvas.view.x * scale
+  const viewportY = BOX.pad - canvas.view.y * scale
+  return (
+    <div
+      data-canvas-minimap
+      title="点击跳转到对应位置"
+      style={{
+        position: 'absolute', right: 10, bottom: 10, zIndex: 4,
+        width: BOX.width, height: BOX.height,
+        background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 8,
+        opacity: 0.85, cursor: 'crosshair',
+      }}
+      onClick={event => {
+        const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+        const contentX = (event.clientX - rect.left - BOX.pad) / scale
+        const contentY = (event.clientY - rect.top - BOX.pad) / scale
+        onViewChange({
+          x: FIT_VIEWPORT.width / 2 - contentX * canvas.view.scale,
+          y: FIT_VIEWPORT.height / 2 - contentY * canvas.view.scale,
+          scale: canvas.view.scale,
+        })
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute', left: viewportX, top: viewportY,
+          width: viewportWidth, height: viewportHeight,
+          border: `1px solid ${theme.accent}`, borderRadius: 2, opacity: 0.9,
+        }}
+      />
+      {[...layout.positions.entries()].map(([id, point]) => (
+        <span
+          key={id}
+          data-minimap-node={id}
+          style={{
+            position: 'absolute',
+            left: BOX.pad + point.x * scale - 1.5,
+            top: BOX.pad + point.y * scale - 1.5,
+            width: 3, height: 3, borderRadius: 1.5,
+            background: canvas.statusOf(id).color,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   const [query, setQuery] = useState('')
   const [tab, setTab] = useState<RightPanelTab>('detail')
@@ -451,6 +514,10 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
             })}
           </div>
         </div>
+
+        {layout.width > 0 && (
+          <MiniMap canvas={canvas} layout={layout} onViewChange={canvas.onViewChange} />
+        )}
 
         {selectedId !== undefined && (
           <RightPanel
