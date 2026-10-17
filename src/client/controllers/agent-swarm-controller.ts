@@ -10,7 +10,7 @@ import {
   type SessionActivity,
   type SwarmTodo,
 } from '../swarm/swarm-model.ts'
-import { inheritedPrefixLength, type SessionEventLike } from '../compare/branch-segment.ts'
+import { conclusionFromEvents, inheritedPrefixLength, type SessionEventLike } from '../compare/branch-segment.ts'
 import { liveTailFromEntries, tailSnippet, type LiveTail, type TailSnippet } from '../live/live-tail.ts'
 import type { LiveWindowLike } from './graph-controller.ts'
 
@@ -75,6 +75,8 @@ export interface AgentSwarmState {
   readonly todos: ReadonlyMap<string, readonly SwarmTodo[]>
   /** The session's agent team, when one exists (members + shared tasks). */
   readonly team: TeamLike | null
+  /** The session's latest conclusion, tail-anchored, for the root card. */
+  readonly rootConclusion: string | null
   /**
    * Last activity per node id (agents and `tool:<callId>` entries — each
    * incoming edge's heat). The view feeds these into `pulseProgress` at each
@@ -147,6 +149,8 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
    * tool stays hot while it runs; a tool that just completed gets one heat
    * stamp so its pulse crawls home and fades.
    */
+  let rootConclusion: string | null = null
+
   const updateActivity = (source: LiveWindowLike): void => {
     const durable = source.entries().filter(entry => entry.type === 'event')
     const flat: SessionEventLike[] = durable.map(entry => ({
@@ -155,8 +159,10 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
       data: entry.event.data,
     }))
     const inherited = inheritedPrefixLength(flat)
+    const ownFlat = flat.filter(event => event.seq >= inherited)
     const own = durable.filter(entry => Number(entry.event.seq) >= inherited)
     const next = activityFromEntries(own)
+    rootConclusion = conclusionFromEvents(ownFlat)
     const now = Date.now()
     if (next.pendingToolId !== null) heat.set(`tool:${next.pendingToolId}`, now)
     const previousPending = activity.pendingToolId
@@ -278,6 +284,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
       toolLayout,
       todos: new Map(todos),
       team,
+      rootConclusion,
       heat: new Map(heat),
     }
   }

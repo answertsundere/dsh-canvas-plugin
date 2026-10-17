@@ -680,6 +680,14 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                 {swarm.rootSnippet.text}
               </div>
             )}
+            {swarm.rootConclusion !== null && (
+              <div
+                data-swarm-root-conclusion
+                style={{ color: theme.muted, marginTop: 4, maxHeight: 72, overflow: 'hidden', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
+              >
+                结论：{swarm.rootConclusion}
+              </div>
+            )}
             {rootTodos === undefined ? null : <TodoList items={rootTodos} limit={7} />}
             {teamTasks.length > 0 && (
               <div data-swarm-team-tasks style={{ marginTop: 6, borderTop: `1px solid ${theme.border}`, paddingTop: 4 }}>

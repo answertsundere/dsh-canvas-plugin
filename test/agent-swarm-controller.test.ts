@@ -302,3 +302,27 @@ describe('team members on the web', () => {
     controller.dispose()
   })
 })
+
+describe('root conclusion in the swarm', () => {
+  it('shows the latest conclusion from the root window', async () => {
+    const fake = makeDeps({ windows: { root: [
+      { type: 'event', event: { type: 'assistant/message', seq: 1, data: { turn: 0, step: 1, message: { content: [{ type: 'text', text: '全部完成' }] } } } },
+    ] } })
+    const controller = createAgentSwarmController(fake.deps, 'root')
+    await flush()
+    expect(controller.state().rootConclusion).toBe('全部完成')
+    controller.dispose()
+  })
+
+  it('ignores the inherited prefix when folding the conclusion', async () => {
+    const fake = makeDeps({ windows: { root: [
+      { type: 'event', event: { type: 'assistant/message', seq: 1, data: { turn: 0, step: 1, message: { content: [{ type: 'text', text: '继承来的' }] } } } },
+      { type: 'event', event: { type: 'session/end-seed', seq: 2, data: { inherited: true } } },
+      { type: 'event', event: { type: 'assistant/message', seq: 3, data: { turn: 0, step: 1, message: { content: [{ type: 'text', text: '自己的结论' }] } } } },
+    ] } })
+    const controller = createAgentSwarmController(fake.deps, 'root')
+    await flush()
+    expect(controller.state().rootConclusion).toBe('自己的结论')
+    controller.dispose()
+  })
+})

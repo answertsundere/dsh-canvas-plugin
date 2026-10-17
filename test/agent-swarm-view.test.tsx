@@ -17,6 +17,7 @@ const swarmState = (over: Partial<AgentSwarmState> = {}): AgentSwarmState => ({
   toolLayout: { maxRadius: 400, positions: new Map() },
   todos: new Map(),
   team: null,
+  rootConclusion: null,
   agents: [
     { id: 'a', label: '检索器', depth: 1, status: 'streaming', snippet: { label: '推理', text: '正在翻资料' }, tail: null },
     { id: 'b', label: '写手', depth: 1, status: 'idle', snippet: null, tail: null },
@@ -436,5 +437,13 @@ describe('rounds 8-9', () => {
     render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
     const chips = [...document.querySelectorAll('[data-swarm-tool]')]
     expect(chips[0]?.getAttribute('data-swarm-tool')).toBe('bad')
+  })
+})
+
+describe('root conclusion in the swarm card', () => {
+  it('shows the inspected session conclusion on the root card', () => {
+    const state = swarmState({ rootConclusion: '最终结论：构建完成' })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-root-conclusion]')?.textContent).toContain('最终结论：构建完成')
   })
 })
