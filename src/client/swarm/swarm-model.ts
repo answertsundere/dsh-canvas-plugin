@@ -244,12 +244,13 @@ export function activityFromEntries(entries: readonly LiveEntryLike[], cap = ACT
         if (typeof callId !== 'string' || callId === '') break
         const rawArguments = typeof data?.['arguments'] === 'string' ? data['arguments'] : ''
         const collapsed = rawArguments.replace(/\s+/g, ' ').trim()
+        const meaningful = collapsed !== '' && collapsed !== '{}' && collapsed !== '[]'
         tools.push({
           id: callId,
           name: typeof data?.['name'] === 'string' ? data['name'] : '…',
           status: 'pending',
           turn: typeof data?.['turn'] === 'number' ? data['turn'] : 0,
-          ...(collapsed === '' ? {} : { preview: collapsed.length > 48 ? `${collapsed.slice(0, 48)}…` : collapsed }),
+          ...(meaningful ? { preview: collapsed.length > 48 ? `${collapsed.slice(0, 48)}…` : collapsed } : {}),
         })
         if (tools.length > cap) tools.shift()
         break

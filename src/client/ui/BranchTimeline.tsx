@@ -138,7 +138,21 @@ export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount,
           <span>第 {turn.index + 1} 轮</span>
           {turn.endedAs !== undefined && <span data-row-ended>{turn.endedAs}</span>}
           {turn.synthetic && <span data-row-synthetic-marker title="分叉时合成的事件">合成</span>}
-          <span style={{ marginLeft: 'auto' }}>{turn.tools.length} 次工具</span>
+          <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span>{turn.tools.length} 次工具</span>
+            {turn.tools.some(tool => tool.preview !== undefined) && (
+              <span
+                data-row-tool-args
+                title={turn.tools
+                  .filter(tool => tool.preview !== undefined)
+                  .map(tool => `${tool.name} ${tool.preview}`)
+                  .join(' | ')}
+                style={{ cursor: 'help' }}
+              >
+                ⌄
+              </span>
+            )}
+          </span>
           <button
             type="button"
             data-fork-row={turn.index}

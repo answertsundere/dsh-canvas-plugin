@@ -47,7 +47,12 @@ export interface BranchTurn {
   readonly lastSeq: number
   readonly userMessage?: string
   readonly assistantSummary?: string
-  readonly tools: readonly { readonly name: string; readonly status: string }[]
+  readonly tools: readonly {
+    readonly name: string
+    readonly status: string
+    /** One-line bounded preview of the call arguments. */
+    readonly preview?: string
+  }[]
   readonly endedAs?: string
   readonly synthetic: boolean
 }

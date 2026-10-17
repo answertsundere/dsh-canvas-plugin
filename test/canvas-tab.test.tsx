@@ -626,3 +626,12 @@ describe('empty workspace hint', () => {
     expect(container.querySelector('[data-canvas-empty]')?.textContent).toContain('归档的会话不会出现在画布上')
   })
 })
+
+describe('minimap selected highlight', () => {
+  it('the selected node dot is highlighted', () => {
+    render(<CanvasTab canvas={model({ selectedId: 'a' })} />)
+    const dot = document.querySelector('[data-minimap-node="a"]') as HTMLElement
+    expect(dot.getAttribute('data-minimap-selected')).toBe('true')
+    expect(dot.style.outline).toContain('solid')
+  })
+})

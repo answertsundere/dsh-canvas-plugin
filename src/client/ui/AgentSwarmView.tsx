@@ -206,7 +206,17 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
   })
   const choosePalette = (id: string): void => {
     setPaletteId(id)
+    setCustomColor(undefined)
+    try { window.localStorage.removeItem('dsh-canvas-custom-color') } catch { /* private mode */ }
     try { window.localStorage.setItem('dsh-canvas-palette', id) } catch { /* private mode */ }
+  }
+  // A custom color wins over every palette until a palette is picked again.
+  const [customColor, setCustomColor] = useState(() => {
+    try { return window.localStorage.getItem('dsh-canvas-custom-color') ?? undefined } catch { return undefined }
+  })
+  const chooseCustomColor = (color: string): void => {
+    setCustomColor(color)
+    try { window.localStorage.setItem('dsh-canvas-custom-color', color) } catch { /* private mode */ }
   }
 
   // Fit the fixed plane into whatever room the overlay has: the web must never
@@ -219,7 +229,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const dragRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null)
   const palette = SWARM_PALETTES.find(candidate => candidate.id === paletteId) ?? SWARM_PALETTES[0] as (typeof SWARM_PALETTES)[number]
-  const accent = paletteAccent(palette, now)
+  const accent = customColor ?? paletteAccent(palette, now)
   useEffect(() => {
     const element = containerRef.current
     if (element === null || typeof ResizeObserver === 'undefined') return
@@ -293,10 +303,19 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
               style={{
                 width: 14, height: 14, borderRadius: 7, padding: 0, cursor: 'pointer',
                 background: candidate.accent ?? 'linear-gradient(120deg, #f66, #6af, #2f9)',
-                border: candidate.id === paletteId ? `2px solid ${theme.text}` : `1px solid ${theme.border}`,
+                border: candidate.id === paletteId && customColor === undefined ? `2px solid ${theme.text}` : `1px solid ${theme.border}`,
               }}
             />
           ))}
+          <input
+            type="color"
+            data-swarm-custom-color
+            title="自定义颜色"
+            aria-label="自定义颜色"
+            value={customColor ?? '#39d0d8'}
+            onChange={event => chooseCustomColor(event.target.value)}
+            style={{ width: 18, height: 18, padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
+          />
           <button
             type="button"
             data-swarm-reset
@@ -452,15 +471,25 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                   if (owner === undefined) return null
                   const to = positionOf(owner.id)
                   return (
-                    <line
-                      key={`assign->${owner.id}`}
-                      data-swarm-assign-edge={owner.id}
-                      x1={0} y1={0} x2={to.x} y2={to.y}
-                      stroke={theme.warn}
-                      strokeWidth={1.4}
-                      strokeDasharray="2 5"
-                      opacity={0.8}
-                    />
+                    <g key={`assign->${owner.id}`}>
+                      <line
+                        data-swarm-assign-edge={owner.id}
+                        x1={0} y1={0} x2={to.x} y2={to.y}
+                        stroke={theme.warn}
+                        strokeWidth={1.4}
+                        strokeDasharray="2 5"
+                        opacity={0.8}
+                      />
+                      <text
+                        data-swarm-assign-label={owner.id}
+                        x={to.x / 2 + 6}
+                        y={to.y / 2 - 4}
+                        fill={theme.warn}
+                        fontSize={10}
+                      >
+                        {task.subject.slice(0, 12)}
+                      </text>
+                    </g>
                   )
                 })}
               {collapseTools(tools).map((group, toolIndex) => {

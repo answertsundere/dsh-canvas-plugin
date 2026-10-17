@@ -262,3 +262,24 @@ describe('conclusionFromEvents', () => {
     ])).toBeNull()
   })
 })
+
+describe('tool argument previews', () => {
+  it('folds whitespace and bounds the preview at 40 chars', () => {
+    const turn = segmentFromEvents('s', 0, [
+      ev(1, 'tool/call', { turn: 0, step: 1, callId: 'c1', name: 'pwsh', arguments: 'npm   test\n--watch mode' }),
+      ev(2, 'tool/result', { message: { toolCallId: 'c1' } }),
+    ])
+    expect(turn.turns[0]?.tools[0]?.preview).toBe('npm test --watch mode')
+  })
+
+  it('a long preview is ellipsized and survives the result pairing', () => {
+    const turn = segmentFromEvents('s', 0, [
+      ev(1, 'tool/call', { turn: 0, step: 1, callId: 'c1', name: 'write', arguments: 'y'.repeat(60) }),
+      ev(2, 'tool/result', { message: { toolCallId: 'c1' }, error: { message: 'disk full' } }),
+    ])
+    const tool = turn.turns[0]?.tools[0]
+    expect(tool?.preview?.length).toBe(41)
+    expect(tool?.preview?.endsWith('…')).toBe(true)
+    expect(tool?.status).toBe('error')
+  })
+})

@@ -122,26 +122,31 @@ const MiniMap: FC<{
           border: `1px solid ${theme.accent}`, borderRadius: 2, opacity: 0.9,
         }}
       />
-      {[...layout.positions.entries()].map(([id, point]) => (
-        <span
-          key={id}
-          data-minimap-node={id}
-          title={canvas.graph.nodes.get(id)?.title}
-          onClick={event => {
-            if (onSelectNode === undefined) return
-            event.stopPropagation()
-            onSelectNode(id)
-          }}
-          style={{
-            position: 'absolute',
-            left: BOX.pad + point.x * scale - 1.5,
-            top: BOX.pad + point.y * scale - 1.5,
-            width: 3, height: 3, borderRadius: 1.5,
-            background: canvas.statusOf(id).color,
-            cursor: onSelectNode === undefined ? 'default' : 'pointer',
-          }}
-        />
-      ))}
+      {[...layout.positions.entries()].map(([id, point]) => {
+        const selected = canvas.selectedId === id
+        return (
+          <span
+            key={id}
+            data-minimap-node={id}
+            data-minimap-selected={selected ? 'true' : 'false'}
+            title={canvas.graph.nodes.get(id)?.title}
+            onClick={event => {
+              if (onSelectNode === undefined) return
+              event.stopPropagation()
+              onSelectNode(id)
+            }}
+            style={{
+              position: 'absolute',
+              left: BOX.pad + point.x * scale - 1.5,
+              top: BOX.pad + point.y * scale - 1.5,
+              width: selected ? 5 : 3, height: selected ? 5 : 3, borderRadius: 1.5,
+              background: canvas.statusOf(id).color,
+              outline: selected ? `1px solid ${theme.accent}` : undefined,
+              cursor: onSelectNode === undefined ? 'default' : 'pointer',
+            }}
+          />
+        )
+      })}
     </div>
   )
 }

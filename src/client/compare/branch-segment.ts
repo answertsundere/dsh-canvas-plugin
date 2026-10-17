@@ -133,7 +133,11 @@ export function segmentFromEvents(
         const name = typeof data?.name === 'string' ? data.name : undefined
         if (name === undefined) break
         current.callIndex.set(typeof data?.callId === 'string' ? data.callId : '', current.tools.length)
-        current.tools.push({ name, status: 'pending' })
+        const rawArguments = typeof data?.arguments === 'string' ? data.arguments : ''
+        const collapsed = rawArguments.replace(/\s+/g, ' ').trim()
+        const meaningful = collapsed !== '' && collapsed !== '{}' && collapsed !== '[]'
+        const preview = meaningful ? (collapsed.length > 40 ? `${collapsed.slice(0, 40)}…` : collapsed) : undefined
+        current.tools.push({ name, status: 'pending', ...(preview === undefined ? {} : { preview }) })
         break
       }
       case 'tool/result': {
@@ -145,7 +149,7 @@ export function segmentFromEvents(
         const failed = data?.error !== undefined
           || (isRecord(data?.message) && data.message.isError === true)
         const existing = current.tools[at]
-        if (existing !== undefined) current.tools[at] = { name: existing.name, status: failed ? 'error' : 'ok' }
+        if (existing !== undefined) current.tools[at] = { name: existing.name, status: failed ? 'error' : 'ok', ...(existing.preview === undefined ? {} : { preview: existing.preview }) }
         break
       }
       default:
@@ -160,7 +164,7 @@ export function segmentFromEvents(
 interface Draft {
   userTexts: string[]
   assistantTexts: string[]
-  tools: { name: string; status: string }[]
+  tools: { name: string; status: string; preview?: string }[]
   callIndex: Map<string, number>
   firstSeq?: number
   lastSeq?: number
