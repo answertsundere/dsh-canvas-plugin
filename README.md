@@ -25,17 +25,20 @@ DSH supports forking natively and the sidebar lists sessions, but:
 Desktop (recommended):
 
 ```bash
-dsh plugin --profile desktop add <package>
+node scripts/install-local.mjs --profile desktop
 ```
+
+The standalone CLI **cannot** install the desktop profile — it hard-rejects `--profile desktop` (`apps/cli/src/args.ts:83-87`), because the desktop profile's plugin set belongs to the app. The script switches to the app's own carrier CLI (`resources/runtime/cli/bin/dsh.cmd`, which runs with `manageDesktopProfile=true`).
+
+**Restart the app afterwards**: a newly added bundle row is read at host boot, and HMR only covers code changes to plugins that are already mounted.
 
 Web profile (development):
 
 ```bash
-dsh plugin --profile web add <package>
+node scripts/install-local.mjs                      # web-0.1.7 by default
+node scripts/install-local.mjs --profile web
 dsh web --port 3090 --no-open
 ```
-
-> The desktop profile's plugin set is owned by the desktop app; the CLI refuses `--profile desktop` (`apps/cli/src/args.ts:83-87`). Local development and M0 verification therefore run on a web profile — the desktop shell loads the same `dsh-web-frontend` client runtime.
 
 ## Explicit v1 limits
 

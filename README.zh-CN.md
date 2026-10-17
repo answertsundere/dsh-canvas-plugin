@@ -25,17 +25,20 @@ DSH 原生支持会话分叉，侧边栏也能看到会话列表，但：
 桌面版（推荐）：
 
 ```bash
-dsh plugin --profile desktop add <包名>
+node scripts/install-local.mjs --profile desktop
 ```
+
+独立 CLI **不能**用来装桌面 profile——它会硬拒 `--profile desktop`（`apps/cli/src/args.ts:83-87`），因为桌面 profile 的插件集合归 App 所有。脚本会自动改用 App 自带的 carrier CLI（`resources/runtime/cli/bin/dsh.cmd`，带 `manageDesktopProfile=true`）。
+
+装完**需要重启 App**：新增的 bundle 行只在 host 启动时读取，HMR 只处理已有插件的代码变更。
 
 Web profile（开发用）：
 
 ```bash
-dsh plugin --profile web add <包名>
+node scripts/install-local.mjs                      # 默认 web-0.1.7
+node scripts/install-local.mjs --profile web
 dsh web --port 3090 --no-open
 ```
-
-> 桌面 profile 的插件集合由桌面 App 自己管理，CLI 拒绝 `--profile desktop`（`apps/cli/src/args.ts:83-87`）。本地开发和 M0 验证因此都走 web profile——桌面壳加载的是同一个 `dsh-web-frontend` 客户端运行时。
 
 ## v1 明确不做
 
@@ -70,8 +73,8 @@ npm 上的 `dsh-canvas` **已被占用**（`0.0.1`，描述为 "Infinite canvas 
 ```bash
 env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD node node_modules/vitest/vitest.mjs run
 env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD ./node_modules/.bin/tsdown
-env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD node scripts/install-local.mjs
-env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD node scripts/m0-check.mjs
+env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD node scripts/install-local.mjs --profile desktop
+env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD node scripts/m0-check.mjs desktop
 ```
 
 `env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD` 不是装饰：宿主的 shim 会拦 pnpm 的 fs 操作，表现为零字节文件或 `EPERM rename`。

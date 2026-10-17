@@ -63,6 +63,16 @@ for (let i = 0; i < argv.length; i++) {
   }
 }
 
+// The standalone CLI hard-rejects `--profile desktop` (apps/cli/src/args.ts:83-87):
+// the desktop profile's plugin set belongs to the app. The app ships its own
+// carrier CLI, which runs with manageDesktopProfile=true and is the only
+// supported way in. Everything else still goes through the repo's CLI.
+const DESKTOP_PROFILE = 'desktop'
+const desktopCli = join(
+  process.env.LOCALAPPDATA ?? join(homedir(), 'AppData', 'Local'),
+  'Programs', 'DeepSeek Harness', 'resources', 'runtime', 'cli', 'bin', 'dsh.cmd',
+)
+
 // pnpm resolves a `file:` dependency by COPYING it into the profile, and it
 // skips the copy while the spec and the version are unchanged. A rebuild alone
 // therefore never reaches the running profile: the server keeps serving the
@@ -74,8 +84,18 @@ if (existsSync(installed)) {
   console.log('removed the previous copy at ' + installed)
 }
 
-execFileSync('corepack', ['pnpm', 'dsh', 'plugin', '--profile', profile, 'add', pkg],
-  { cwd: REPO, stdio: 'inherit', shell: true })
-
-console.log('installed into profile "' + profile + '"; boot it with: corepack pnpm dsh '
-  + profile + ' --port ' + PORT + ' --no-open')
+if (profile === DESKTOP_PROFILE) {
+  if (!existsSync(desktopCli)) {
+    fail('the desktop profile can only be installed through the app carrier CLI, not found at '
+      + desktopCli)
+  }
+  // Passed as one command string: the CLI path contains a space ("DeepSeek
+  // Harness"), and execFileSync with shell:true does not quote a file argument.
+  execFileSync(`"${desktopCli}" plugin --profile ${profile} add "${pkg}"`, { stdio: 'inherit', shell: true })
+  console.log('installed into the desktop profile; restart the app so it reads the new bundle row')
+} else {
+  execFileSync('corepack', ['pnpm', 'dsh', 'plugin', '--profile', profile, 'add', pkg],
+    { cwd: REPO, stdio: 'inherit', shell: true })
+  console.log('installed into profile "' + profile + '"; boot it with: corepack pnpm dsh '
+    + profile + ' --port ' + PORT + ' --no-open')
+}

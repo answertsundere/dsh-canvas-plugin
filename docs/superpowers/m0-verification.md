@@ -52,6 +52,23 @@ plugins/??...,@deepseek-ai/dsh-client-ui-trajectory/client.js,
 
 未验证：浏览器 DOM 里 `[对话｜轨迹｜画布]` 三个 tab 是否真的渲染，以及卸载后是否消失。这需要带鉴权的浏览器会话。
 
+## 桌面 profile（用户实际使用的那个）
+
+前一轮只装了 `web-0.1.7`（开发/验证用），**桌面 profile 没装**——这是交付缺口，已补。
+
+| 检查 | 结果 |
+|---|---|
+| 桌面内核版本 `resources/runtime/primary-runtime/runtime.json` | `desktopVersion: 0.2.0-rc.2` —— 与验证目标一致 |
+| 安装通道 | App 自带 carrier CLI（独立 CLI 硬拒 `--profile desktop`） |
+| `desktop/package.json` dependencies | `dsh-canvas: file:C:/Users/sshuser/Desktop/dsh-canvas-plugin` |
+| `desktop/package.json` `dsh.profile.bundles` | 含 `dsh-canvas` |
+| `desktop/node_modules/dsh-canvas/lib/client.js` | 76230 字节，与 `lib/client.js` **逐字节一致** |
+| `scripts/m0-check.mjs desktop` | **11/11** |
+
+桌面 App 是 Electron 进程内传输，**没有 HTTP 端口**可探，因此无法像 web 那样抓 bundle 验证。剩下唯一未验的一步是：重启 App 后 tab 条是否出现「画布」。
+
+**新增 bundle 行只在 host 启动时读取**，HMR 只覆盖已挂载插件的代码变更——所以装完必须重启 App。
+
 ## 本次踩到的两个环境坑（都会静默失败）
 
 ### 1. pnpm 11 的 `allowBuilds` 占位符
