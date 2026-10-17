@@ -32,6 +32,7 @@ const makeDeps = (options: Options = {}) => {
   }
   const sent: { text: string; requestId: string }[] = []
   const openSession = vi.fn()
+  let connected = options.connected !== false
 
   const forkDeps: ForkDeps = {
     fork: vi.fn(async (request: { onCreated?: (id: string) => void }) => {
@@ -56,7 +57,7 @@ const makeDeps = (options: Options = {}) => {
       workspaceId: options.workspaceId === undefined ? 'w1' : options.workspaceId,
       cwd: options.cwd === undefined ? 'C:/w' : options.cwd,
     }),
-    isConnected: () => options.connected !== false,
+    isConnected: () => connected,
     openSession,
     forkDeps,
     readEvents: async id => {
@@ -70,6 +71,7 @@ const makeDeps = (options: Options = {}) => {
     forkDeps,
     sent,
     openSession,
+    setConnected: (next: boolean) => { connected = next },
     setRows: (nextIds: string[], nextById: Record<string, unknown>) => {
       ids = nextIds
       byId = nextById
@@ -113,6 +115,50 @@ describe('createGraphController', () => {
   it('reports unknown for a node it has never seen', () => {
     const model = createGraphController(makeDeps().deps).model()
     expect(model.statusOf('ghost').kind).toBe('unknown')
+  })
+
+  // M0 gate 9: a link that drops must not leave a stale `running:true` reading
+  // as live, and a link that comes back must recover the live statuses — a
+  // connection loss is not allowed to wedge the canvas in `unknown` forever.
+  it('drops every status to unknown while the link is down', () => {
+    const fake = makeDeps()
+    const controller = createGraphController(fake.deps)
+    const model = controller.model()
+    expect(model.statusOf('b').kind).toBe('thinking')
+
+    fake.setConnected(false)
+    controller.refresh()
+    expect(model.statusOf('a').kind).toBe('unknown')
+    expect(model.statusOf('b').kind).toBe('unknown')
+  })
+
+  it('recovers the live statuses when the link comes back', () => {
+    const fake = makeDeps()
+    const controller = createGraphController(fake.deps)
+    const model = controller.model()
+
+    fake.setConnected(false)
+    controller.refresh()
+    expect(model.statusOf('b').kind).toBe('unknown')
+
+    fake.setConnected(true)
+    controller.refresh()
+    expect(model.statusOf('a').kind).toBe('idle')
+    expect(model.statusOf('b').kind).toBe('thinking')
+  })
+
+  it('keeps refreshing through a flapping link', () => {
+    // Each refresh re-reads the link, so repeated losses cannot wedge the tab:
+    // the last state of the link always wins.
+    const fake = makeDeps()
+    const controller = createGraphController(fake.deps)
+    const model = controller.model()
+
+    for (const connected of [false, true, false, true]) {
+      fake.setConnected(connected)
+      controller.refresh()
+      expect(model.statusOf('b').kind).toBe(connected ? 'thinking' : 'unknown')
+    }
   })
 
   it('tracks the selection through the model getters', () => {

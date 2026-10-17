@@ -769,13 +769,39 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 **Note on the SDD ledger:** `.superpowers/` is gitignored (0 files tracked), so the ledger is a local working artifact. Everything durable from it — every contract correction with its file:line evidence — is written into this plan file, which *is* tracked. That is deliberate: the knowledge must survive a clone even though the scratch ledger does not.
 
 - [ ] Run `pnpm verify` (typecheck+test+build). **Done: 167 tests green, typecheck clean, 76.23 kB / 21.47 kB gzip.**
-- [ ] Install into the **web** profile and walk the 12 M0 gates. **Partially done** — see `docs/superpowers/m0-verification.md`: gate 1 passes at the transport layer, gates 2/3/5/6/7/12 are unit-verified, gates 4/9/10 are **not run**.
+- [ ] Install into the **web** profile and walk the 12 M0 gates. **Partially done** — see `docs/superpowers/m0-verification.md`: gate 1 passes at the transport layer, gates 2/3/5/6/7/12 are unit-verified. **Update (Task 15):** gates 4/9/10 are no longer NOT RUN — 10 passes with measurements, 4 is unit+source-verified, 9's flap semantics are unit-verified; still not run are a real network drop and the browser DOM check.
 - [ ] Fix every FAIL before continuing. **Done** — the two environment blockers and the three code bugs are fixed and pinned by tests.
 - [ ] Commit the results doc: `test: M0 verification results`. **Done.**
 - [ ] READMEs / LICENSE / notices / CI / compat matrix. **Done.**
 - [ ] `publint --strict` + `attw --pack . --profile esm-only`. **Not run** — both need a network install of the tooling, and publishing is blocked on the rename anyway.
 - [ ] npm name availability check. **Done, and it failed** — see above.
 - [ ] Commit: `chore: packaging, docs, and publish pipeline`.
+
+---
+
+### Task 14: Desktop profile delivery (user-reported gap)
+
+**Files:** `scripts/install-local.mjs`, `README.md`, `README.zh-CN.md`, `docs/superpowers/m0-verification.md`
+
+**Task 14 findings (2026-10-17):**
+- **The plugin was never installed into the desktop profile.** Everything through Task 13 targeted `web-0.1.7` (the dev/verification profile); the user's actual environment is the desktop app. The plugin had therefore never been available where they actually use DSH. The user caught this.
+- The standalone CLI **hard-rejects** `--profile desktop` (`apps/cli/src/args.ts:83-87`) — the desktop profile's plugin set belongs to the app. The only supported channel is the app's own carrier CLI: `%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd` (runs with `manageDesktopProfile=true`). `scripts/install-local.mjs` now routes that profile through it.
+- Two install-script bugs found while doing it: (a) `execFileSync` with `shell: true` does **not** quote a file argument, so the CLI path's space ("DeepSeek Harness") split the command — fixed by passing one command string; (b) both READMEs told users to run `dsh plugin --profile desktop add`, which cannot work — corrected.
+- Verified: desktop kernel `desktopVersion: 0.2.0-rc.2` matches the version every API was verified against; `desktop/package.json` carries the `file:` dependency **and** the `dsh.profile.bundles` row; the installed copy is byte-identical to `lib/client.js`; `node scripts/m0-check.mjs desktop` is 11/11.
+- The desktop app is Electron with in-process transport and **no HTTP port**, so the bundle cannot be fetched and inspected the way the web profile allows. A newly added bundle row is read at host boot and HMR covers only code changes to already-mounted plugins, so **an app restart is required**; the running app was not killed (that decision belongs to the user).
+
+---
+
+### Task 15: M0 gates 4, 9, 10 — finish what was NOT RUN
+
+**Files:** `test/graph-scale.test.ts`, `test/graph-controller.test.ts`, `docs/superpowers/m0-verification.md`
+
+**Task 15 findings (2026-10-17):**
+- **Gate 10 passes with measurements.** 500 nodes in four shapes (random lineage ~70% fork rate / 500-deep chain / 1+499 star / 500-node ring), fixed-seed LCG so the fixture is reproducible: build+layout between 1.3 and 2.7 ms per shape — three orders of magnitude inside a 5 s budget. The ring fixture is the one that would have hung on an unbounded cycle-promotion loop; the chain fixture is the one that would have blown the layout recursion (500 deep) or drawn a staircase.
+- **Gate 4 is source-verified: an empty branch does NOT auto-execute an inherited queued message.** A queued message is durable — it lands as an `agent/inbox/spliced` session event (`packages/core/agent-loop/src/inbox.ts:239`); `buildForkSeed` copies the parent prefix verbatim (`packages/core/session/src/fork.ts:21-30`), so the child reconstructs that pending message; the fork command creates the child and attaches it but sends **no** prompt (`packages/api/session-controller/src/commands.ts:244-305`); and the `ReactLoopAgent` constructor leaves the phase idle and never calls `wakeDriver` (`packages/core/agent-loop/src/agent.ts:125-141`) — its only callers are a wakeful send (agent.ts:160) and turn/maintenance completion follow-ups (agent.ts:200, agent.ts:262), none of which run at creation. The canvas half was already unit-tested (`launch:'later'` forks without prompting; `launch:'now'` with a blank instruction is rejected before touching the host; the dialog disables 立即开跑 on a blank instruction).
+- UX consequence pinned from the same source: a later explicit prompt to the child is appended **after** the inherited pending message (`prompt` → `agent.followup`, commands.ts:359-361), so on claim the inherited one runs first. v1 shows no queue depth, so no assertion depends on it.
+- **Gate 9: the flap layer is now unit-tested.** The disconnect half was already covered (`runtime-status.test.ts`: disconnection outranks every signal → `unknown`; a stale `running:true` never reads as live). Added at the controller: drop → every status `unknown`; recovery → live statuses return (not wedged); repeated flapping → the last link state always wins. A real network drop/reconnect is transport behavior the host owns; the canvas only consumes snapshots.
+- The verification doc gained an **SRC** caliber (conclusion proven line-by-line against the local checkout, not run on a real session) so "source-verified" can never be confused with "tested live". Suite: 14 files / 175 tests green.
 
 ---
 
