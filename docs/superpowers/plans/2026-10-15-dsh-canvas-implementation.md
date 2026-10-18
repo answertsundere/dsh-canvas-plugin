@@ -1042,6 +1042,15 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34b: rounds 25–26 — the spiral clamps, the args expand (2026-10-17)
+
+- **Round 25 (layout bug)**: the tool spiral's radius grew without bound — at ~12 tools it crossed the viewport's half-height and the ring clipped off-screen. `layoutActivity` now distributes tools between baseRadius and maxRadius (the whole spiral always fits), with the turn gap retained. 20-tool fixtures stay inside 340px.
+- **Round 26 (expandable args)**: the ⌄ marker on a detail row is now a toggle that expands an **inline monospace block listing each tool's arguments** — the preview is no longer hover-only.
+
+**Numbers:** 18 files / **345 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34: rounds 22–24 — readable rows, draggable minimap, header breakdown (2026-10-17)
 
 - **Round 22**: detail rows list the **actual tool sequence** (`read · pwsh ✗ · write`), errors in red, each with a hoverable argument hint; a turn without tools shows no list.
