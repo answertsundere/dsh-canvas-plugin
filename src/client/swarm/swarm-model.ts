@@ -561,3 +561,16 @@ export function collapseTools(tools: readonly ActivityTool[]): CollapsedTool[] {
   }
   return collapsed
 }
+
+/**
+ * Team tasks ordered for the board: in-progress work on top, then pending,
+ * then finished — the order the user needs, not the order the log happened
+ * to record. Stable within each band.
+ */
+export function orderTeamTasks<T extends { readonly status: string }>(tasks: readonly T[]): T[] {
+  const rank = (status: string): number => (status === 'in_progress' ? 0 : status === 'pending' ? 1 : 2)
+  const withRank = tasks.map((task, index) => ({ task, index, rank: rank(task.status) }))
+  return withRank
+    .sort((a, b) => a.rank - b.rank || a.index - b.index)
+    .map(entry => entry.task)
+}

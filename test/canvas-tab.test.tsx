@@ -695,3 +695,13 @@ describe('Esc layering and search cycling', () => {
     expect(searchNext).toHaveBeenCalledWith('')
   })
 })
+
+describe('hover highlights spokes', () => {
+  it('hovering a node lights its edge', () => {
+    const { container } = render(<CanvasTab canvas={model()} />)
+    const card = document.querySelector('[data-canvas-node="a"]') as HTMLElement
+    fireEvent.mouseEnter(card)
+    const edge = container.querySelector('[data-canvas-edges] path[marker-end]') as SVGPathElement
+    expect(edge.getAttribute('stroke')).toBe('#e6e9ef')
+  })
+})

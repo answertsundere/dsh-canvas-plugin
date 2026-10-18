@@ -358,6 +358,8 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   // once the pointer travels past the threshold, the click is swallowed.
   const suppressClick = useRef(false)
   const dragStart = useRef<{ x: number; y: number } | null>(null)
+  // Hovering a node highlights its spokes.
+  const [hoverId, setHoverId] = useState<SessionId | undefined>(undefined)
   const handleNodeClick = (event: ReactMouseEvent<HTMLDivElement>, id: SessionId): void => {
     if (suppressClick.current) return
     if (event.metaKey || event.ctrlKey) canvas.onToggleCompare(id)
@@ -570,13 +572,13 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   <path d="M 0 0 L 10 5 L 0 10 z" fill={theme.warn} />
                 </marker>
               </defs>
-              {edgePaths(canvas, layout.positions).map(edge => (
+              {edgePaths(canvas, layout.positions, hoverId).map(edge => (
                 <path
                   key={`${edge.from}->${edge.to}`}
                   d={edge.d}
                   fill="none"
-                  stroke={edge.active ? theme.accent : edge.busy ? theme.warn : theme.border}
-                  strokeWidth={edge.active ? 1.8 : edge.busy ? 1.6 : 1.5}
+                  stroke={edge.active ? theme.accent : edge.hover ? theme.text : edge.busy ? theme.warn : theme.border}
+                  strokeWidth={edge.active ? 1.8 : edge.hover ? 2 : edge.busy ? 1.6 : 1.5}
                   opacity={edge.active ? 1 : edge.busy ? 0.8 : 0.7}
                   markerEnd={edge.active ? 'url(#dsh-arrow-accent)' : edge.busy ? 'url(#dsh-arrow-warn)' : 'url(#dsh-arrow)'}
                 />
@@ -606,6 +608,8 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   onOpen={id => canvas.openInChat?.(id)}
                   onInspect={canvas.inspectSwarm === undefined ? undefined : openSwarm}
                   onContext={openContext}
+                  onMouseEnter={() => setHoverId(node.id)}
+                  onMouseLeave={() => setHoverId(undefined)}
                 />
               )
             })}
@@ -709,8 +713,8 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   )
 }
 
-function edgePaths(canvas: CanvasModel, positions: ReadonlyMap<SessionId, LayoutPoint>) {
-  const edges: { from: SessionId; to: SessionId; d: string; active: boolean; busy: boolean }[] = []
+function edgePaths(canvas: CanvasModel, positions: ReadonlyMap<SessionId, LayoutPoint>, hoverId?: SessionId) {
+  const edges: { from: SessionId; to: SessionId; d: string; active: boolean; busy: boolean; hover: boolean }[] = []
   for (const node of canvas.graph.nodes.values()) {
     if (node.parentId === null) continue
     const from = positions.get(node.parentId)
@@ -728,6 +732,7 @@ function edgePaths(canvas: CanvasModel, positions: ReadonlyMap<SessionId, Layout
       active: canvas.selectedId === node.id || canvas.compareIds.includes(node.id),
       // A thread feeding a working session is never border-dark.
       busy: status === 'thinking' || status === 'tool',
+      hover: hoverId !== undefined && (node.id === hoverId || node.parentId === hoverId),
     })
   }
   return edges

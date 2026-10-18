@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { AgentSwarmView } from '../src/client/ui/AgentSwarmView.tsx'
 import type { AgentSwarmState } from '../src/client/controllers/agent-swarm-controller.ts'
 import { paletteAccent, SWARM_PALETTES } from '../src/client/swarm/swarm-model.ts'
@@ -508,5 +508,42 @@ describe('header breakdown', () => {
     const state = activityState()
     render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
     expect(document.querySelector('[data-swarm-root]')?.textContent).toContain('设备')
+  })
+})
+
+describe('team task board ordering', () => {
+  it('in-progress work sits on top of the board', () => {
+    const state = activityState({
+      team: {
+        members: [],
+        tasks: [
+          { id: 't1', subject: 'done', status: 'completed' },
+          { id: 't2', subject: 'active', status: 'in_progress' },
+          { id: 't3', subject: 'waiting', status: 'pending' },
+        ],
+      },
+    })
+    const { container } = render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    const rows = [...container.querySelectorAll('[data-swarm-team-task-status]')]
+    expect(rows[0]?.getAttribute('data-swarm-team-task-status')).toBe('in_progress')
+    expect(rows[0]?.textContent).toContain('active')
+  })
+})
+
+describe('tool chip copy', () => {
+  it('clicking a tool chip copies name plus preview', async () => {
+    const writeText = vi.fn(async () => {})
+    Object.assign(navigator, { clipboard: { writeText } })
+    const state = activityState({
+      activity: {
+        turnCount: 0, openTurn: false, currentTurn: null,
+        tools: [{ id: 'c1', name: 'pwsh', status: 'pending', turn: 0, preview: 'npm test' }],
+        pendingToolId: 'c1',
+      },
+      toolLayout: { maxRadius: 400, positions: new Map([['c1', { x: 0, y: -300 }]]) },
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    fireEvent.click(document.querySelector('[data-swarm-tool="c1"]') as Element)
+    await waitFor(() => { expect(writeText).toHaveBeenCalledWith('pwsh npm test') })
   })
 })

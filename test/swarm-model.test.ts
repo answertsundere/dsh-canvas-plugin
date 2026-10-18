@@ -454,3 +454,18 @@ describe('tool failure messages', () => {
     expect(activity.tools[0]?.error).toBe('exit code 1')
   })
 })
+
+import { orderTeamTasks } from '../src/client/swarm/swarm-model.ts'
+
+describe('orderTeamTasks', () => {
+  it('puts in-progress first, then pending, then finished — stable within bands', () => {
+    const tasks = [
+      { id: '1', subject: 'done-1', status: 'completed' },
+      { id: '2', subject: 'active', status: 'in_progress' },
+      { id: '3', subject: 'pending-1', status: 'pending' },
+      { id: '4', subject: 'done-2', status: 'completed' },
+      { id: '5', subject: 'pending-2', status: 'pending' },
+    ]
+    expect(orderTeamTasks(tasks).map(t => t.subject)).toEqual(['active', 'pending-1', 'pending-2', 'done-1', 'done-2'])
+  })
+})

@@ -4,6 +4,7 @@ import {
   anchoredPan,
   collapseTools,
   fitScale,
+  orderTeamTasks,
   paletteAccent,
   pulseProgress,
   SWARM_PALETTES,
@@ -259,7 +260,9 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
   const pendingTool = tools.find(tool => tool.id === swarm.activity.pendingToolId) ?? null
   const groups = turnGroups(tools)
   const rootTodos = swarm.todos.get(swarm.rootId)
-  const teamTasks = (swarm.team?.tasks ?? []).filter(task => task.status !== 'deleted')
+  const teamTasks = orderTeamTasks(
+    (swarm.team?.tasks ?? []).filter(task => task.status !== 'deleted'),
+  )
   const rootHeat = swarm.heat.get(swarm.rootId)
   const rootHot = rootHeat !== undefined && pulseProgress(rootHeat, now) !== null
 
@@ -616,7 +619,14 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                 key={tool.id}
                 data-swarm-tool={tool.id}
                 data-swarm-tool-status={tool.status}
-                title={tool.error}
+                title={tool.error ?? (tool.preview !== undefined ? `点击复制：${tool.name} ${tool.preview}` : undefined)}
+                onClick={() => {
+                  if (tool.preview === undefined) return
+                  const clipboard = (globalThis as {
+                    navigator?: { clipboard?: { writeText(text: string): Promise<void> } }
+                  }).navigator?.clipboard
+                  void clipboard?.writeText(`${tool.name} ${tool.preview}`).catch(() => { /* private mode */ })
+                }}
                 style={{
                   position: 'absolute',
                   transform: 'translate(-50%, -50%)',
@@ -634,6 +644,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                   font: '11px/1.4 system-ui, sans-serif',
                   whiteSpace: 'nowrap',
                   userSelect: 'none',
+                  cursor: tool.preview !== undefined ? 'copy' : 'default',
                 }}
               >
                 <RobotAvatar

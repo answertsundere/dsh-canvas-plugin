@@ -35,10 +35,14 @@ export interface NodeCardProps {
   onInspect?(id: string): void
   /** Right-click: the canvas-level shortcut menu (fork / inspect / open). */
   onContext?(event: MouseEvent<HTMLDivElement>, id: string): void
+  /** Hover begins — the canvas highlights this node's spokes. */
+  onMouseEnter?(id: string): void
+  /** Hover ends. */
+  onMouseLeave?(id: string): void
 }
 
 export const NodeCard: FC<NodeCardProps> = ({
-  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, active = false, dimmed = false, now, onClick, onOpen, onInspect, onContext,
+  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, active = false, dimmed = false, now, onClick, onOpen, onInspect, onContext, onMouseEnter, onMouseLeave,
 }) => (
   <div
     data-canvas-node={node.id}
@@ -50,6 +54,8 @@ export const NodeCard: FC<NodeCardProps> = ({
     onClick={event => onClick(event, node.id)}
     onDoubleClick={event => { event.stopPropagation(); onOpen?.(node.id) }}
     onContextMenu={onContext === undefined ? undefined : event => { event.preventDefault(); onContext(event, node.id) }}
+    onMouseEnter={onMouseEnter === undefined ? undefined : () => onMouseEnter(node.id)}
+    onMouseLeave={onMouseLeave === undefined ? undefined : () => onMouseLeave(node.id)}
     style={{
       position: 'absolute',
       left: position.x,
