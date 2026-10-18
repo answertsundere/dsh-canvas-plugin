@@ -1042,6 +1042,16 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34c: rounds 27–29 — board order, chip copy, hover spokes (2026-10-17)
+
+- **Round 27**: the team task board orders itself — in-progress on top, then pending, then finished (`orderTeamTasks`, pure, stable within bands).
+- **Round 28**: clicking a tool chip copies its **command line** (name + preview) to the clipboard; `copy` cursor advertises it.
+- **Round 29**: hovering a canvas node lights its spokes at full-strength text stroke (`hoverId` threaded through `edgePaths`); `NodeCard` gains mouse-enter/leave props.
+
+**Numbers:** 18 files / **349 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34b: rounds 25–26 — the spiral clamps, the args expand (2026-10-17)
 
 - **Round 25 (layout bug)**: the tool spiral's radius grew without bound — at ~12 tools it crossed the viewport's half-height and the ring clipped off-screen. `layoutActivity` now distributes tools between baseRadius and maxRadius (the whole spiral always fits), with the turn gap retained. 20-tool fixtures stay inside 340px.
