@@ -299,3 +299,31 @@ describe('conclusion copy', () => {
     expect(document.querySelector('[data-copy-conclusion]')).toBeNull()
   })
 })
+
+describe('tool names in rows', () => {
+  const turnWithTools = (tools: BranchTurn['tools']): BranchTurn => ({
+    index: 0, userMessage: '问', tools, firstSeq: 1, lastSeq: 9, synthetic: false,
+  })
+
+  it('shows each tool name in sequence, errors in red', () => {
+    render(<BranchTimeline
+      turns={[turnWithTools([
+        { name: 'read', status: 'ok' },
+        { name: 'pwsh', status: 'error', preview: 'exit 1' },
+      ])]}
+      inheritedCount={0}
+      cwdWarning={false}
+      onFork={() => {}}
+    />)
+    const names = document.querySelector('[data-row-tool-names]')
+    expect(names?.textContent).toContain('read')
+    expect(names?.textContent).toContain('pwsh')
+    const errSpan = names?.querySelector('[data-row-tool-error="true"]')
+    expect(errSpan?.textContent).toContain('pwsh')
+  })
+
+  it('a turn without tools shows no name list', () => {
+    render(<BranchTimeline turns={[turnWithTools([])]} inheritedCount={0} cwdWarning={false} onFork={() => {}} />)
+    expect(document.querySelector('[data-row-tool-names]')).toBeNull()
+  })
+})

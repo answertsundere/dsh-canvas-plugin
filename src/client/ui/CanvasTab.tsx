@@ -89,6 +89,17 @@ const MiniMap: FC<{
   onViewChange(view: CanvasView): void
   onSelectNode?(id: SessionId): void
 }> = ({ canvas, layout, onViewChange, onSelectNode }) => {
+  // Dragging anywhere on the minimap pans the real view in real time.
+  const dragRef = useRef<{ x: number; y: number; viewX: number; viewY: number } | null>(null)
+  const onDragMove = (event: ReactMouseEvent): void => {
+    const started = dragRef.current
+    if (started === null) return
+    onViewChange({
+      x: started.viewX - (event.clientX - started.x),
+      y: started.viewY - (event.clientY - started.y),
+      scale: canvas.view.scale,
+    })
+  }
   const BOX = { width: 148, height: 96, pad: 6 }
   const scale = Math.min(
     BOX.width / Math.max(layout.width, 1),
@@ -108,6 +119,12 @@ const MiniMap: FC<{
         background: theme.panel, border: `1px solid ${theme.border}`, borderRadius: 8,
         opacity: 0.85, cursor: 'crosshair',
       }}
+      onMouseDown={event => {
+        dragRef.current = { x: event.clientX, y: event.clientY, viewX: canvas.view.x, viewY: canvas.view.y }
+      }}
+      onMouseMove={onDragMove}
+      onMouseUp={() => { dragRef.current = null }}
+      onMouseLeave={() => { dragRef.current = null }}
       onClick={event => {
         const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
         const contentX = (event.clientX - rect.left - BOX.pad) / scale

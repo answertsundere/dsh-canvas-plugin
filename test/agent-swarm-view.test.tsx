@@ -494,3 +494,19 @@ describe('Esc layering', () => {
     expect(document.querySelector('[data-swarm-root]')).not.toBeNull()
   })
 })
+
+describe('header breakdown', () => {
+  it('the header separates agents from devices', () => {
+    const state = activityState()
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-root]')?.textContent).toContain('设备')
+  })
+})
+
+describe('header breakdown', () => {
+  it('the header separates agents from devices', () => {
+    const state = activityState()
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-root]')?.textContent).toContain('设备')
+  })
+})

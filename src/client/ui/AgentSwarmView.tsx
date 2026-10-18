@@ -289,7 +289,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
           {agents.filter(a => a.status === 'failed').length > 0 && (
             <span style={{ color: '#e0554d' }}>失败 {agents.filter(a => a.status === 'failed').length} · </span>
           )}
-          {agents.length} 个 agent · 近 {swarm.activity.turnCount + (swarm.activity.openTurn ? 1 : 0)} 轮
+          {agents.length} 个 agent · 设备 {tools.length} · 近 {swarm.activity.turnCount + (swarm.activity.openTurn ? 1 : 0)} 轮
           {swarm.activity.openTurn ? '（进行中）' : ''}
           {swarm.team != null ? ` · 团队 ${swarm.team.members.length} 人` : ''}
           {pendingTool !== null ? ` · 正在 ${pendingTool.name}` : ''}
