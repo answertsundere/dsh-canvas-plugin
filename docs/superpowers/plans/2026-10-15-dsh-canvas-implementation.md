@@ -1042,6 +1042,16 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 33: rounds 19–21 — profile cards, completion feedback, interaction pass (2026-10-17)
+
+- **Round 19 (profile cards)**: the todo list and the team task board each carry a **progress bar** (done ratio, green fill).
+- **Round 20 (completion feedback)**: a freshly completed tool **pops an expanding green ring** at its chip (the controller's one-shot completion heat drives it); a failed chip shows its **error line** in red on the card.
+- **Round 21 (interaction)**: **Escape unwinds layer by layer** — context menu first, then the swarm, then the selection (the swarm view no longer owns its own Escape listener; the canvas layers it). **Enter in the search input cycles** to the next match (`searchNext` in the controller).
+
+**Numbers:** 18 files / **339 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 32: rounds 16–18 — hard fixes and the cockpit (2026-10-17, from the approved design plan)
 
 - **Round 16 (hard fixes)**: the minimap was mounted in the flex row — its absolute position overlapped the detail panel; it now lives **inside the canvas surface**. The conclusion block has a **live state** (breathing 正在产出结论… while the branch streams, honest 还没有结论 when settled without one). A window resize **re-fits** the view (200ms debounce) and **double-clicking empty canvas space re-fits**; the toolbar 适配视图 shares the same fitView.
