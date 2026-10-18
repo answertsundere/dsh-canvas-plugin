@@ -1042,6 +1042,16 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34: rounds 22–24 — readable rows, draggable minimap, header breakdown (2026-10-17)
+
+- **Round 22**: detail rows list the **actual tool sequence** (`read · pwsh ✗ · write`), errors in red, each with a hoverable argument hint; a turn without tools shows no list.
+- **Round 23**: the minimap **pans the real view while dragging** (mousedown + move), not just on click; node dots still select.
+- **Round 24**: the swarm header separates agents from devices (`N 个 agent · 设备 M · 近 X 轮`).
+
+**Numbers:** 18 files / **343 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 33: rounds 19–21 — profile cards, completion feedback, interaction pass (2026-10-17)
 
 - **Round 19 (profile cards)**: the todo list and the team task board each carry a **progress bar** (done ratio, green fill).
