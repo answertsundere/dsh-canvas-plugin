@@ -225,7 +225,8 @@ describe('CanvasTab', () => {
 
   it('draws one edge per non-root node', () => {
     const { container } = render(<CanvasTab canvas={model()} />)
-    expect(container.querySelectorAll('[data-canvas-edges] path')).toHaveLength(1)
+    // Only the spoke paths count; the defs' marker paths live inside <marker>.
+    expect(container.querySelectorAll('[data-canvas-edges] path[marker-end]')).toHaveLength(1)
   })
 
   it('opens a node in the conversation on double click', () => {

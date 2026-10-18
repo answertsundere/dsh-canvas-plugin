@@ -526,6 +526,17 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
               height={Math.max(layout.height, 1)}
               style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}
             >
+              <defs>
+                <marker id="dsh-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill={theme.border} />
+                </marker>
+                <marker id="dsh-arrow-accent" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill={theme.accent} />
+                </marker>
+                <marker id="dsh-arrow-warn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill={theme.warn} />
+                </marker>
+              </defs>
               {edgePaths(canvas, layout.positions).map(edge => (
                 <path
                   key={`${edge.from}->${edge.to}`}
@@ -534,6 +545,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   stroke={edge.active ? theme.accent : edge.busy ? theme.warn : theme.border}
                   strokeWidth={edge.active ? 1.8 : edge.busy ? 1.6 : 1.5}
                   opacity={edge.active ? 1 : edge.busy ? 0.8 : 0.7}
+                  markerEnd={edge.active ? 'url(#dsh-arrow-accent)' : edge.busy ? 'url(#dsh-arrow-warn)' : 'url(#dsh-arrow)'}
                 />
               ))}
             </svg>
@@ -555,6 +567,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   highlight={needle !== '' && matches(node.title, node.id, needle)}
                   live={nodeTail === null ? null : tailSnippet(nodeTail, 40)}
                   active={nodeStatus.kind === 'thinking' || nodeStatus.kind === 'tool' || nodeTail !== null}
+                  dimmed={now - node.createdAt > 24 * 60 * 60 * 1000}
                   now={now}
                   onClick={handleNodeClick}
                   onOpen={id => canvas.openInChat?.(id)}
@@ -589,6 +602,39 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
             onTabChange={setTab}
             onClose={() => canvas.clearSelection?.()}
           >
+            {tab === 'detail' && selectedId !== undefined && (
+              <div
+                data-panel-actions
+                style={{ display: 'flex', gap: 6, padding: '6px 10px', borderBottom: `1px solid ${theme.border}` }}
+              >
+                <button
+                  type="button"
+                  data-action-open-chat
+                  onClick={() => canvas.openInChat?.(selectedId)}
+                  style={{ background: theme.card, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 6, padding: '3px 8px', font: 'inherit', cursor: 'pointer' }}
+                >
+                  打开对话
+                </button>
+                <button
+                  type="button"
+                  data-action-fork-latest
+                  title="从最新一条消息之后分叉"
+                  onClick={() => { setPendingForkFor(selectedId); setTab('detail') }}
+                  style={{ background: theme.card, color: theme.text, border: `1px solid ${theme.border}`, borderRadius: 6, padding: '3px 8px', font: 'inherit', cursor: 'pointer' }}
+                >
+                  ⑂ 从最新分叉
+                </button>
+              </div>
+            )}
+            {tab === 'detail' && (effectiveDetail?.turns.length ?? 0) > 0 && (
+              <div
+                data-panel-stats
+                style={{ padding: '6px 10px', color: theme.muted, font: '11px system-ui, sans-serif', borderBottom: `1px solid ${theme.border}` }}
+              >
+                共 {effectiveDetail?.turns.length} 轮 · {effectiveDetail?.turns.reduce((sum, turn) => sum + turn.tools.length, 0)} 次工具
+                {swarm !== null && swarm.state().activity.turnCount > 0 ? '' : ''}
+              </div>
+            )}
             {tab === 'detail' ? (
               <BranchTimeline
                 turns={effectiveDetail?.turns ?? []}

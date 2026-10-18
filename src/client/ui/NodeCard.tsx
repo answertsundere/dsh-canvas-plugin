@@ -25,6 +25,8 @@ export interface NodeCardProps {
    * from across the room. The keyframes live in the canvas's injected style.
    */
   readonly active?: boolean
+  /** Older than a day: slightly dimmed so recent work reads first. */
+  readonly dimmed?: boolean
   readonly now: number
   onClick(event: MouseEvent<HTMLDivElement>, id: string): void
   /** Opens the session in the conversation view. */
@@ -36,7 +38,7 @@ export interface NodeCardProps {
 }
 
 export const NodeCard: FC<NodeCardProps> = ({
-  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, active = false, now, onClick, onOpen, onInspect, onContext,
+  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, active = false, dimmed = false, now, onClick, onOpen, onInspect, onContext,
 }) => (
   <div
     data-canvas-node={node.id}
@@ -66,6 +68,7 @@ export const NodeCard: FC<NodeCardProps> = ({
       cursor: 'pointer',
       overflow: 'hidden',
       userSelect: 'none',
+      opacity: dimmed ? 0.72 : 1,
       ...(active
         ? {
             animation: 'dshCanvasBreath 1.6s ease-in-out infinite',

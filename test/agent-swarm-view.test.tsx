@@ -447,3 +447,16 @@ describe('root conclusion in the swarm card', () => {
     expect(document.querySelector('[data-swarm-root-conclusion]')?.textContent).toContain('最终结论：构建完成')
   })
 })
+
+describe('assignment labels', () => {
+  it('the thread labels its task at the midpoint', () => {
+    const state = activityState({
+      team: {
+        members: [{ id: 'root', name: 'lead', role: 'lead', phase: 'active' }],
+        tasks: [{ id: 't1', subject: '搭建页面框架', status: 'in_progress', ownerName: '检索器' }],
+      },
+    })
+    const { container } = render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(container.querySelector('[data-swarm-assign-label="a"]')?.textContent).toContain('搭建页面框架')
+  })
+})
