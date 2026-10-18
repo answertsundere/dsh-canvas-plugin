@@ -224,6 +224,19 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
     setFork({ rowIndex: lastIdx, atSeq })
   }, [pendingForkFor, effectiveDetail])
 
+  // Esc unwinds layer by layer: context menu first, then the swarm, then the
+  // selection — one press per layer, never all at once.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      if (menu !== null) { setMenu(null); return }
+      if (swarmRef.current !== null) { closeSwarm(); return }
+      if (selectedId !== undefined) canvas?.clearSelection?.()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('keydown', onKey) }
+  })
+
   // Fit the view once, when the first nodes arrive — an empty opening canvas
   // that grows into a lopsided corner is exactly what 适配视图 exists for.
   // A window resize re-fits: the layout that fit 1600px does not fit 900px.
@@ -443,11 +456,14 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
         <input
           data-canvas-search
           value={query}
-          placeholder="搜索会话"
+          placeholder="搜索会话（Enter 跳下一个）"
           aria-label="搜索会话"
           onChange={event => {
             setQuery(event.target.value)
             canvas.search(event.target.value)
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') canvas.searchNext?.(query)
           }}
           style={{
             background: theme.bg, color: theme.text, border: `1px solid ${theme.border}`,

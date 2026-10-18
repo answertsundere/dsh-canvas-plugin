@@ -60,6 +60,8 @@ export interface GraphController {
   toggleCompare(id: SessionId): void
   /** Records the term and locates the first match. */
   search(text: string): void
+  /** Jumps to the match AFTER the currently selected one (Enter-to-cycle). */
+  searchNext(text: string): void
   openInChat(id: SessionId): void
   forkFromRow(sessionId: SessionId, atSeq: number, instruction: string, launch: LaunchMode): Promise<ForkResult>
   /** Null until exactly two branches are selected, or when their events cannot be read. */
@@ -247,15 +249,30 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
     notify()
   }
 
-  const search = (text: string): void => {
+  const matches = (text: string): SessionId[] => {
     const needle = text.trim().toLowerCase()
-    if (needle === '') return
-    const hit = [...graph.nodes.values()].find(
-      node => node.title.toLowerCase().includes(needle) || node.id.toLowerCase().includes(needle),
-    )
+    if (needle === '') return []
+    return [...graph.nodes.values()]
+      .filter(node => node.title.toLowerCase().includes(needle) || node.id.toLowerCase().includes(needle))
+      .map(node => node.id)
+  }
+
+  const search = (text: string): void => {
     // 定位: typing jumps to the first match. Highlighting stays local to the tab.
-    if (hit !== undefined && hit.id !== selectedId) {
-      selectedId = hit.id
+    const hit = matches(text)[0]
+    if (hit !== undefined && hit !== selectedId) {
+      selectedId = hit
+      notify()
+    }
+  }
+
+  const searchNext = (text: string): void => {
+    const ids = matches(text)
+    if (ids.length === 0) return
+    const at = ids.indexOf(selectedId as SessionId)
+    const next = ids[(at + 1) % ids.length] as SessionId
+    if (next !== selectedId) {
+      selectedId = next
       notify()
     }
   }
@@ -330,6 +347,7 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
     onToggleCompare: toggleCompare,
     onViewChange: next => { view = next; notify() },
     search,
+    searchNext,
     refresh,
     subscribe: listener => {
       listeners.add(listener)
@@ -396,7 +414,7 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
 
   refresh()
   return {
-    model, refresh, select, toggleCompare, search, openInChat, forkFromRow, compare,
+    model, refresh, select, toggleCompare, search, searchNext, openInChat, forkFromRow, compare,
     subscribe: listener => {
       listeners.add(listener)
       return () => { listeners.delete(listener) }

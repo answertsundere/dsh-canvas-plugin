@@ -39,6 +39,8 @@ export interface CanvasModel {
   onToggleCompare(id: string): void
   onViewChange(view: CanvasView): void
   search(text: string): void
+  /** Jumps to the match after the current selection (Enter-to-cycle). */
+  searchNext?(text: string): void
   /** Optional: the toolbar only shows 刷新 when the controller supplies one. */
   refresh?(): void
   /**

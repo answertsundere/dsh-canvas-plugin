@@ -349,12 +349,6 @@ describe('tool collapse and assignment edges', () => {
 })
 
 describe('Esc close and palette persistence', () => {
-  it('Escape hands control back to the canvas', () => {
-    const onClose = vi.fn()
-    render(<AgentSwarmView swarm={swarmState()} onClose={onClose} nowMs={NOW} />)
-    fireEvent.keyDown(window, { key: 'Escape' })
-    expect(onClose).toHaveBeenCalledTimes(1)
-  })
 
   it('the palette choice is remembered across reloads', () => {
     window.localStorage.setItem('dsh-canvas-palette', 'amber')
@@ -458,5 +452,45 @@ describe('assignment labels', () => {
     })
     const { container } = render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
     expect(container.querySelector('[data-swarm-assign-label="a"]')?.textContent).toContain('搭建页面框架')
+  })
+})
+
+describe('completion pop and error line', () => {
+  it('a freshly completed tool pops an expanding green ring', () => {
+    const state = activityState({
+      activity: {
+        turnCount: 0, openTurn: false, currentTurn: null,
+        tools: [{ id: 'c1', name: 'read', status: 'ok', turn: 0 }],
+        pendingToolId: null,
+      },
+      toolLayout: { maxRadius: 400, positions: new Map([['c1', { x: 100, y: -200 }]]) },
+      heat: new Map([['tool:c1', NOW - 200]]),
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-pop="tool:c1"]')).not.toBeNull()
+  })
+
+  it('a failed tool shows its error line on the chip', () => {
+    const state = activityState({
+      activity: {
+        turnCount: 0, openTurn: false, currentTurn: null,
+        tools: [{ id: 'x', name: 'pwsh', status: 'error', turn: 0, error: 'exit 1' }],
+        pendingToolId: null,
+      },
+      toolLayout: { maxRadius: 400, positions: new Map([['x', { x: 100, y: -200 }]]) },
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-tool-error]')?.textContent).toContain('exit 1')
+  })
+})
+
+describe('Esc layering', () => {
+  it('the swarm view no longer owns Escape — the canvas layers it', () => {
+    // AgentSwarmView renders fine without wiring its own Escape: the canvas
+    // handles Esc so menu > swarm > selection unwind in order.
+    render(<AgentSwarmView swarm={swarmState()} onClose={() => {}} nowMs={NOW} />)
+    fireEvent.keyDown(window, { key: 'Escape' })
+    // No crash; the canvas layer decides what Esc does.
+    expect(document.querySelector('[data-swarm-root]')).not.toBeNull()
   })
 })

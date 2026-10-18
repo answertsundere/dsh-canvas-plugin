@@ -662,3 +662,36 @@ describe('minimap lives inside the canvas surface', () => {
     expect(onViewChange).toHaveBeenCalled()
   })
 })
+
+describe('Esc layering and search cycling', () => {
+  it('Esc closes the menu first, then the swarm', async () => {
+    const dispose = vi.fn()
+    const canvas = {
+      ...model({
+        inspectSwarm: () => ({ state: () => swarmStateFake, subscribe: () => () => {}, dispose }) as never,
+      }),
+    }
+    render(<CanvasTab canvas={canvas} />)
+    // Open the swarm first — it stays open underneath the menu layering.
+    fireEvent.click(document.querySelector('[data-node-inspect="a"]') as Element)
+    expect(document.querySelector('[data-swarm-root]')).not.toBeNull()
+    // Open the context menu on top.
+    fireEvent.contextMenu(document.querySelector('[data-canvas-node="a"]') as Element)
+    expect(document.querySelector('[data-context-menu]')).not.toBeNull()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    // Menu closed, swarm untouched.
+    expect(document.querySelector('[data-context-menu]')).toBeNull()
+    expect(document.querySelector('[data-swarm-root]')).not.toBeNull()
+    // Second press: the swarm closes and the controller is disposed.
+    fireEvent.keyDown(window, { key: 'Escape' })
+    await waitFor(() => { expect(document.querySelector('[data-swarm-root]')).toBeNull() })
+    expect(dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('Enter in the search input cycles to the next match', () => {
+    const searchNext = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({ searchNext })} />)
+    fireEvent.keyDown(container.querySelector('[data-canvas-search]') as Element, { key: 'Enter' })
+    expect(searchNext).toHaveBeenCalledWith('')
+  })
+})

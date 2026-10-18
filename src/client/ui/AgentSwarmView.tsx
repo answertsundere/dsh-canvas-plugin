@@ -83,8 +83,20 @@ const TodoList: FC<{ readonly items: readonly SwarmTodo[]; readonly limit: numbe
   const done = items.filter(item => item.status === 'completed').length
   return (
     <div data-swarm-todos style={{ marginTop: 4 }}>
-      <div style={{ color: theme.muted, marginBottom: 2 }}>
-        任务 {done}/{items.length}
+      <div style={{ color: theme.muted, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span>任务 {done}/{items.length}</span>
+        <span
+          data-swarm-todo-bar
+          style={{ flex: '1 1 auto', height: 3, borderRadius: 1.5, background: theme.border, overflow: 'hidden', position: 'relative' }}
+        >
+          <span
+            style={{
+              position: 'absolute', left: 0, top: 0, bottom: 0,
+              width: `${items.length === 0 ? 0 : (done / items.length) * 100}%`,
+              background: '#2f9e6f', borderRadius: 1.5,
+            }}
+          />
+        </span>
       </div>
       {items.slice(0, limit).map(item => (
         <div
@@ -185,15 +197,6 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
     return () => { window.clearInterval(timer) }
   }, [nowMs])
   const now = nowMs ?? tick
-
-  // Esc hands control back to the canvas, like 返回画布 does.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => { window.removeEventListener('keydown', onKey) }
-  }, [onClose])
 
   // The palette choice survives reloads; storage failures degrade to
   // session-only choice.
@@ -498,6 +501,10 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                 const heatAt = swarm.heat.get(`tool:${tool.id}`)
                 const progress = heatAt === undefined ? null : pulseProgress(heatAt, now)
                 const sweep = progress === null ? sweepProgress(toolIndex, now) : null
+                // A completion pop: the brief expanding ring right after a tool
+                // finishes (the controller stamps heat exactly once for it).
+                const sinceSettle = tool.status !== 'pending' && heatAt !== undefined ? now - heatAt : Infinity
+                const settlePop = sinceSettle <= 600 ? sinceSettle / 600 : null
                 return (
                   <g key={`tool->${tool.id}`}>
                     <path
@@ -521,6 +528,18 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                         r={3}
                         fill={theme.accent}
                         opacity={0.55}
+                      />
+                    )}
+                    {settlePop !== null && tool.status === 'ok' && (
+                      <circle
+                        data-swarm-pop={`tool:${tool.id}`}
+                        cx={to.x}
+                        cy={to.y}
+                        r={6 + settlePop * 14}
+                        fill="none"
+                        stroke="#2f9e6f"
+                        strokeWidth={2 - settlePop}
+                        opacity={1 - settlePop}
                       />
                     )}
                   </g>
@@ -634,6 +653,14 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                 <span style={{ flex: '0 0 auto', color: failed ? '#e0554d' : theme.muted }}>
                   {pending ? '…' : failed ? '✗' : '✓'}
                 </span>
+                {failed && tool.error !== undefined && (
+                  <span
+                    data-swarm-tool-error
+                    style={{ overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 90, color: '#e0554d' }}
+                  >
+                    {tool.error}
+                  </span>
+                )}
               </div>
             )
           })}
@@ -691,8 +718,20 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
             {rootTodos === undefined ? null : <TodoList items={rootTodos} limit={7} />}
             {teamTasks.length > 0 && (
               <div data-swarm-team-tasks style={{ marginTop: 6, borderTop: `1px solid ${theme.border}`, paddingTop: 4 }}>
-                <div style={{ color: theme.muted, marginBottom: 2 }}>
-                  团队任务 {teamTasks.filter(task => task.status === 'completed').length}/{teamTasks.length}
+                <div style={{ color: theme.muted, marginBottom: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span>团队任务 {teamTasks.filter(task => task.status === 'completed').length}/{teamTasks.length}</span>
+                  <span
+                    data-swarm-team-bar
+                    style={{ flex: '1 1 auto', height: 3, borderRadius: 1.5, background: theme.border, overflow: 'hidden', position: 'relative' }}
+                  >
+                    <span
+                      style={{
+                        position: 'absolute', left: 0, top: 0, bottom: 0,
+                        width: `${teamTasks.length === 0 ? 0 : (teamTasks.filter(task => task.status === 'completed').length / teamTasks.length) * 100}%`,
+                        background: '#2f9e6f', borderRadius: 1.5,
+                      }}
+                    />
+                  </span>
                 </div>
                 {teamTasks.slice(0, 5).map(task => (
                   <div key={task.id} data-swarm-team-task-status={task.status} style={{ display: 'flex', gap: 4, color: task.status === 'completed' ? theme.muted : theme.text }}>
