@@ -327,3 +327,23 @@ describe('tool names in rows', () => {
     expect(document.querySelector('[data-row-tool-names]')).toBeNull()
   })
 })
+
+describe('expandable args', () => {
+  const turnWithPreview: BranchTurn = {
+    index: 0, userMessage: '问', tools: [
+      { name: 'pwsh', status: 'error', preview: 'npm test --watch' },
+    ], firstSeq: 1, lastSeq: 9, synthetic: false,
+  }
+
+  it('clicking the args marker expands the inline parameter block', () => {
+    render(<BranchTimeline turns={[turnWithPreview]} inheritedCount={0} cwdWarning={false} onFork={() => {}} />)
+    expect(document.querySelector('[data-row-args-detail]')).toBeNull()
+    fireEvent.click(document.querySelector('[data-row-tool-args]') as Element)
+    expect(document.querySelector('[data-row-args-detail]')?.textContent).toContain('pwsh: npm test --watch')
+    const detail = document.querySelector('[data-row-args-detail]')
+    expect(detail?.textContent).toContain('pwsh: npm test --watch')
+    // Toggle back off.
+    fireEvent.click(document.querySelector('[data-row-tool-args]') as Element)
+    expect(document.querySelector('[data-row-args-detail]')).toBeNull()
+  })
+})

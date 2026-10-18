@@ -293,28 +293,26 @@ export function activityFromEntries(entries: readonly LiveEntryLike[], cap = ACT
  */
 export function layoutActivity(
   tools: readonly ActivityTool[],
-  opts: { baseRadius?: number; radialStep?: number; angularStep?: number; turnGap?: number; turnLift?: number } = {},
+  opts: { baseRadius?: number; maxRadius?: number; angularStep?: number; turnGap?: number } = {},
 ): { positions: ReadonlyMap<string, { x: number; y: number }>; maxRadius: number } {
-  const baseRadius = opts.baseRadius ?? 240
-  const radialStep = opts.radialStep ?? 26
+  const baseRadius = opts.baseRadius ?? 200
+  const maxRadius = opts.maxRadius ?? 340
   const angularStep = opts.angularStep ?? 0.62
   const turnGap = opts.turnGap ?? 0.5
-  const turnLift = opts.turnLift ?? 18
   const positions = new Map<string, { x: number; y: number }>()
+  // The spiral grows toward maxRadius and then circles there — the whole ring
+  // always fits the view, no matter how many tools the session ran.
+  const radialStep = tools.length > 1 ? (maxRadius - baseRadius) / (tools.length - 1) : 0
   let angle = -Math.PI / 2
   let radius = baseRadius
   let previousTurn: number | null = null
   tools.forEach(tool => {
-    if (previousTurn !== null && tool.turn !== previousTurn) {
-      angle += turnGap
-      radius += turnLift
-    }
+    if (previousTurn !== null && tool.turn !== previousTurn) angle += turnGap
     positions.set(tool.id, { x: radius * Math.cos(angle), y: radius * Math.sin(angle) })
     previousTurn = tool.turn
     angle += angularStep
-    radius += radialStep
+    radius = Math.min(maxRadius, radius + radialStep)
   })
-  const maxRadius = tools.length === 0 ? baseRadius : radius - radialStep
   return { positions, maxRadius }
 }
 

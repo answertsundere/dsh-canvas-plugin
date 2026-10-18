@@ -191,38 +191,48 @@ describe('activityFromEntries', () => {
 })
 
 describe('layoutActivity', () => {
-  it('spirals outward in execution order, so the sequence is visible', () => {
+  it('spirals outward in execution order and stays within maxRadius', () => {
     const activity = activityFromEntries([call(1, 'c1', 'a'), call(2, 'c2', 'b'), call(3, 'c3', 'c')])
-    const layout = layoutActivity(activity.tools, { baseRadius: 240, radialStep: 26, angularStep: 0.62 })
+    const layout = layoutActivity(activity.tools, { baseRadius: 200, maxRadius: 340 })
     const radii = activity.tools.map(tool => {
       const p = layout.positions.get(tool.id)!
       return Math.hypot(p.x, p.y)
     })
-    expect(radii[0]).toBeCloseTo(240, 5)
-    expect(radii[1]).toBeCloseTo(266, 5)
-    expect(radii[2]).toBeCloseTo(292, 5)
-    expect(layout.maxRadius).toBeCloseTo(292, 5)
+    expect(radii[0]).toBeDefined()
+    expect(radii[0]!).toBeCloseTo(200, 5)
+    expect(radii[2]!).toBeCloseTo(340, 5)
+    // Monotonically outward — the sequence reads.
+    expect(radii[1]!).toBeGreaterThan(radii[0]!)
+    expect(layout.maxRadius).toBe(340)
   })
 
-  it('a turn boundary adds an angular gap and a radial lift', () => {
+  it('many tools converge onto the outer ring instead of overflowing', () => {
+    const entries = Array.from({ length: 20 }, (_, i) => call(i + 1, `c${i}`, 't'))
+    const activity = activityFromEntries(entries)
+    const layout = layoutActivity(activity.tools, { baseRadius: 200, maxRadius: 340 })
+    for (const tool of activity.tools) {
+      const p = layout.positions.get(tool.id)!
+      expect(Math.hypot(p.x, p.y)).toBeLessThanOrEqual(340.5)
+    }
+  })
+
+  it('a turn boundary adds an angular gap', () => {
     const tools = [
       { id: 'a', name: 'x', status: 'ok' as const, turn: 0 },
       { id: 'b', name: 'y', status: 'ok' as const, turn: 1 },
     ]
-    const layout = layoutActivity(tools, { baseRadius: 240, radialStep: 26, angularStep: 0.62, turnGap: 0.5, turnLift: 18 })
+    const layout = layoutActivity(tools, { baseRadius: 200, maxRadius: 340, angularStep: 0.62, turnGap: 0.5 })
     const a = layout.positions.get('a')!
     const b = layout.positions.get('b')!
     const angleA = Math.atan2(a.y, a.x)
     const angleB = Math.atan2(b.y, b.x)
-    // Step = 0.62 + turn gap 0.5 across the boundary.
     expect(angleB - angleA).toBeCloseTo(0.62 + 0.5, 5)
-    expect(Math.hypot(b.x, b.y)).toBeCloseTo(240 + 26 + 18, 5)
   })
 
-  it('an empty list has no positions and the base radius as its bound', () => {
+  it('an empty list has no positions', () => {
     const layout = layoutActivity([])
     expect(layout.positions.size).toBe(0)
-    expect(layout.maxRadius).toBe(240)
+    expect(layout.maxRadius).toBe(340)
   })
 })
 

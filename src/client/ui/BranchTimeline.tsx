@@ -37,6 +37,15 @@ export function cutSeqAt(turns: readonly BranchTurn[], rowIndex: number): number
 
 export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount, onFork, cwdWarning, live = null, conclusion }) => {
   const [copied, setCopied] = useState(false)
+  const [expandedArgs, setExpandedArgs] = useState<ReadonlySet<number>>(() => new Set())
+  const toggleArgs = (index: number): void => {
+    setExpandedArgs(current => {
+      const next = new Set(current)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+  }
   const copyConclusion = (): void => {
     if (conclusion === null || conclusion === undefined) return
     const clipboard = (globalThis as {
@@ -155,10 +164,11 @@ export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount,
                     {tool.preview !== undefined && (
                       <span
                         data-row-tool-args
-                        title={`${tool.name} ${tool.preview}`}
-                        style={{ cursor: 'help', opacity: 0.75 }}
+                        title="点击展开本轮参数"
+                        onClick={() => toggleArgs(turn.index)}
+                        style={{ cursor: 'pointer', opacity: 0.75 }}
                       >
-                        {' '}⌄
+                        {' '}{expandedArgs.has(turn.index) ? '⌃' : '⌄'}
                       </span>
                     )}
                   </span>
@@ -166,6 +176,18 @@ export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount,
               </span>
             )}
           </span>
+          {expandedArgs.has(turn.index) && (
+            <div
+              data-row-args-detail
+              style={{ marginTop: 4, padding: '4px 8px', borderRadius: 6, background: theme.card, color: theme.muted, font: '11px/1.6 ui-monospace, monospace' }}
+            >
+              {turn.tools.filter(tool => tool.preview !== undefined).map((tool, index) => (
+                <div key={`${index}-${tool.name}`}>
+                  {tool.name}: {tool.preview}
+                </div>
+              ))}
+            </div>
+          )}
           <button
             type="button"
             data-fork-row={turn.index}
