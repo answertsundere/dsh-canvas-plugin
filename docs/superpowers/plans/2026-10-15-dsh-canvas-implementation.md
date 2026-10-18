@@ -1042,6 +1042,16 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 32: rounds 16–18 — hard fixes and the cockpit (2026-10-17, from the approved design plan)
+
+- **Round 16 (hard fixes)**: the minimap was mounted in the flex row — its absolute position overlapped the detail panel; it now lives **inside the canvas surface**. The conclusion block has a **live state** (breathing 正在产出结论… while the branch streams, honest 还没有结论 when settled without one). A window resize **re-fits** the view (200ms debounce) and **double-clicking empty canvas space re-fits**; the toolbar 适配视图 shares the same fitView.
+- **Round 17 (cockpit)**: the detail panel leads with a cockpit strip — 打开对话 and ⑂ 从最新分叉 one-click actions (the fork reuses the pending-fork effect at the last real row) — plus a stats line (共 N 轮 · M 次工具).
+- **Round 18 (spatial narrative)**: canvas spokes carry **arrowheads** (three markers: border / accent / warn per state), and nodes older than a day **dim to 0.72** so recent work reads first.
+
+**Evidence:** minimap is a surface descendant (regression-tested); 335 tests green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 31: round 15 — the swarm root card shows the conclusion (2026-10-17)
 
 The inspected session's latest conclusion (the R5 conclusion logic, excluding the inherited prefix) renders on the swarm's root card under the live snippet — the 实况 view now answers "what did this session conclude" without opening the conversation. **331 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
