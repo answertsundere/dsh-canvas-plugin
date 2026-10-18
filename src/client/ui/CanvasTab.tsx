@@ -70,6 +70,10 @@ const CANVAS_CSS = `
 @keyframes dshIdleSwing { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
 @keyframes dshIdleTap { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @keyframes dshIdleGlint { 0%, 70%, 100% { opacity: 0.8; } 80% { opacity: 0.1; } }
+@keyframes dshWaitBreath { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+[data-conclusion-waiting] { animation: dshWaitBreath 1.6s ease-in-out infinite; }
+@keyframes dshWaitBreath { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
+[data-conclusion-waiting] { animation: dshWaitBreath 1.6s ease-in-out infinite; }
 .dsh-robot-v-search.dsh-robot-idle [data-robot-part='magnifier'] { transform-origin: 24px 20px; animation: dshIdleSwing 3.6s ease-in-out infinite; }
 .dsh-robot-v-write.dsh-robot-idle [data-robot-part='pencil'] { animation: dshIdleTap 2.8s ease-in-out infinite; }
 .dsh-robot-v-read.dsh-robot-idle .dsh-robot-eye { animation: dshIdleGlint 4.2s ease-in-out infinite; }
@@ -222,11 +226,10 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
 
   // Fit the view once, when the first nodes arrive — an empty opening canvas
   // that grows into a lopsided corner is exactly what 适配视图 exists for.
+  // A window resize re-fits: the layout that fit 1600px does not fit 900px.
   const autoFitted = useRef(false)
-  useEffect(() => {
-    if (autoFitted.current || canvas === undefined) return
-    if (canvas.graph.nodes.size === 0) return
-    autoFitted.current = true
+  const fitView = (): void => {
+    if (canvas === undefined) return
     const layout = layoutLayered(canvas.graph, { nodeWidth: NODE_WIDTH, nodeHeight: NODE_HEIGHT })
     if (layout.width === 0 || layout.height === 0) return
     const fitScale = Math.min(
@@ -236,11 +239,32 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
     )
     const clamped = Math.max(MIN_SCALE, Math.min(MAX_SCALE, fitScale === 0 ? 1 : fitScale))
     canvas.onViewChange({
-      x: ((FIT_VIEWPORT.width - layout.width * clamped) / 2),
-      y: ((FIT_VIEWPORT.height - layout.height * clamped) / 2),
+      x: (FIT_VIEWPORT.width - layout.width * clamped) / 2,
+      y: (FIT_VIEWPORT.height - layout.height * clamped) / 2,
       scale: clamped,
     })
-  }, [canvas, canvas?.graph.nodes.size])
+  }
+  useEffect(() => {
+    if (autoFitted.current || canvas === undefined) return
+    if (canvas.graph.nodes.size === 0) return
+    autoFitted.current = true
+    fitView()
+  }, [canvas, canvas?.graph.nodes.size, fitView])
+
+  // Window resize re-fits with a small debounce — the layout that fit 1600px
+  // does not fit 900px, and fighting the user mid-drag helps no one.
+  useEffect(() => {
+    let timer: number | undefined
+    const onResize = (): void => {
+      window.clearTimeout(timer)
+      timer = window.setTimeout(() => { fitView() }, 200)
+    }
+    window.addEventListener('resize', onResize)
+    return () => {
+      window.clearTimeout(timer)
+      window.removeEventListener('resize', onResize)
+    }
+  }, [fitView])
 
   const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null)
   const openContext = (event: ReactMouseEvent<HTMLDivElement>, id: string): void => {
@@ -310,22 +334,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
     else canvas.onSelect(id)
   }
 
-  const fit = (): void => {
-    if (layout.width === 0 || layout.height === 0) {
-      canvas.onViewChange({ x: 0, y: 0, scale: 1 })
-      return
-    }
-    const scale = clamp(Math.min(
-      FIT_VIEWPORT.width / layout.width,
-      FIT_VIEWPORT.height / layout.height,
-      1,
-    ), MIN_SCALE, MAX_SCALE)
-    canvas.onViewChange({
-      x: (FIT_VIEWPORT.width - layout.width * scale) / 2,
-      y: (FIT_VIEWPORT.height - layout.height * scale) / 2,
-      scale,
-    })
-  }
+  const fit = (): void => { fitView() }
 
   const openFork = (rowIndex: number): void => {
     const atSeq = cutSeqAt(effectiveDetail?.turns ?? [], rowIndex)
@@ -478,6 +487,11 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
           }}
           onMouseUp={() => { drag.current = null }}
           onMouseLeave={() => { drag.current = null }}
+          onDoubleClick={event => {
+            // Double-clicking empty canvas space re-fits the view.
+            if ((event.target as HTMLElement).closest('[data-canvas-node]')) return
+            fitView()
+          }}
           onWheel={event => {
             const factor = event.deltaY < 0 ? 1.1 : 1 / 1.1
             canvas.onViewChange({ ...canvas.view, scale: clamp(canvas.view.scale * factor, MIN_SCALE, MAX_SCALE) })
@@ -550,16 +564,16 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
               )
             })}
           </div>
-        </div>
 
-        {layout.width > 0 && (
-          <MiniMap
-            canvas={canvas}
-            layout={layout}
-            onViewChange={canvas.onViewChange}
-            onSelectNode={id => canvas.onSelect(id)}
-          />
-        )}
+          {layout.width > 0 && (
+            <MiniMap
+              canvas={canvas}
+              layout={layout}
+              onViewChange={canvas.onViewChange}
+              onSelectNode={id => canvas.onSelect(id)}
+            />
+          )}
+        </div>
 
         {selectedId !== undefined && (
           <RightPanel

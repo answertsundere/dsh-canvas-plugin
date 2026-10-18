@@ -635,3 +635,29 @@ describe('minimap selected highlight', () => {
     expect(dot.style.outline).toContain('solid')
   })
 })
+
+describe('minimap lives inside the canvas surface', () => {
+  it('the minimap is a descendant of the surface, never overlapping the panel', () => {
+    const { container } = render(<CanvasTab canvas={model()} />)
+    expect(container.querySelector('[data-canvas-surface] [data-canvas-minimap]')).not.toBeNull()
+  })
+
+  it('a window resize re-fits the view', async () => {
+    const onViewChange = vi.fn()
+    render(<CanvasTab canvas={model({ onViewChange })} />)
+    onViewChange.mockClear()
+    fireEvent(window, new Event('resize'))
+    // The resize listener debounces 200ms before re-fitting.
+    await new Promise(resolve => setTimeout(resolve, 250))
+    expect(onViewChange).toHaveBeenCalled()
+  })
+
+  it('double-clicking empty canvas space re-fits', () => {
+    const onViewChange = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({ onViewChange })} />)
+    onViewChange.mockClear()
+    const surface = container.querySelector('[data-canvas-surface]') as HTMLElement
+    fireEvent.doubleClick(surface)
+    expect(onViewChange).toHaveBeenCalled()
+  })
+})

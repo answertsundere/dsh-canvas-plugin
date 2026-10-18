@@ -55,7 +55,7 @@ export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount,
       style={{ padding: '8px 10px', borderBottom: `1px solid ${theme.border}`, background: theme.card }}
     >
       <div style={{ color: theme.muted, marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
-        <span>最新结论</span>
+        <span>{live != null ? '最新结论（正在产出…）' : '最新结论'}</span>
         {conclusion != null && (
           <button
             type="button"
@@ -73,7 +73,9 @@ export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount,
       </div>
       {conclusion
         ? <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{conclusion}</div>
-        : <div style={{ color: theme.muted }}>还没有结论</div>}
+        : live != null
+          ? <div data-conclusion-waiting style={{ color: theme.accent }}>▍正在产出结论…</div>
+          : <div style={{ color: theme.muted }}>还没有结论</div>}
     </div>
     <div data-timeline-inherited style={{ color: theme.muted, padding: '6px 10px', borderBottom: `1px solid ${theme.border}` }}>
       继承 {inheritedCount} 个事件（不计入对比）
