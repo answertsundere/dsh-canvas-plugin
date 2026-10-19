@@ -1042,6 +1042,16 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34k: rounds 46–48 — legend, layout glide, member conclusions (2026-10-17)
+
+- **Round 46 (legend)**: collapsible status legend in the toolbar — 思考中/工具执行/空闲/失败 four-color dots.
+- **Round 47 (layout glide)**: node cards **glide when the layout re-arranges** (collapse/expand, new sessions) instead of teleporting — `left/top` transition via the injected sheet.
+- **Round 48 (member conclusions)**: agent chips in the swarm show their **own latest conclusion** (folded from their own window, excluding the inherited prefix) — the board, the swarm, and the map all answer 得出了什么 at every level.
+
+**Numbers:** 18 files / **378 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34j: round 45 — glow layer and selected-card breath (2026-10-17)
 
 Busy threads render a **Gaussian-blurred amber glow** underneath (`feGaussianBlur` filter; the glow duplicate renders only on busy edges — idle edges stay cheap), and the **selected card breathes a soft accent ring** (`dshSelectedBreath`). **374 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
