@@ -1042,6 +1042,15 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34j–k: rounds 53–54 — Chinese tool labels and member descriptions (2026-10-17)
+
+- **Round 53**: `toolLabel` (pure) maps DSH tool families to **Chinese labels** across all views — the swarm tool chips, detail row tool names, and agent chips now show 终端/读取/写入/搜索/发消息/创建队友 instead of English tool names. Unknown tools fall back to raw.
+- **Round 54**: agent chips in the swarm show their **own latest conclusion** (folded from their own window, excluding the inherited prefix) and their **job description** (from `team/member` events).
+
+**Numbers:** 18 files / **382 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34l: rounds 49–51 — persistent collapse, hover spokes, empty state (2026-10-17)
 
 - **Round 49 (persistent collapse)**: subtree collapse state moved from tab-local useState into the controller — it survives tab switches; the fixture needs a stateful Harness because the fixture's toggle must force re-renders the way notify() does.
