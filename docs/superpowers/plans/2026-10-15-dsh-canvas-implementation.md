@@ -1042,6 +1042,12 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34j: round 45 — glow layer and selected-card breath (2026-10-17)
+
+Busy threads render a **Gaussian-blurred amber glow** underneath (`feGaussianBlur` filter; the glow duplicate renders only on busy edges — idle edges stay cheap), and the **selected card breathes a soft accent ring** (`dshSelectedBreath`). **374 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34i: visual pass — texture, hover lift, flowing threads, run badge (2026-10-17)
 
 The researched visual quick wins, implemented: **dot-grid canvas texture** (24px radial-gradient), **node hover lift** (translateY + shadow via injected CSS), **busy threads flow** (dash animation on edges feeding working sessions, matching the swarm's silk), and a toolbar **N 运行中** badge. **372 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
