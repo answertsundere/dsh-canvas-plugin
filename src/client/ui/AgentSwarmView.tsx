@@ -607,6 +607,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                     </div>
                     <div style={{ color: theme.muted, fontSize: 10 }}>
                       {agent.role === 'teammate' ? '团队成员' : agent.role === 'lead' ? '团队主管' : '子代理'}
+                      {agent.toolCount > 0 ? ` · ${agent.toolCount} 工具` : ''}
                       {agent.status === 'failed' ? ' · 失败' : ''}
                       {busyOwners.has(agent.label) ? ' · 执行任务中' : ''}
                     </div>

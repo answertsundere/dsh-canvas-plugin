@@ -376,3 +376,25 @@ describe('archived teammates', () => {
     controller.dispose()
   })
 })
+
+describe('agent tool counts', () => {
+  it('an agent chip carries the number of tools its session ran', async () => {
+    const fake = makeDeps({ windows: { root: [], mate: [
+      { type: 'event', event: { type: 'tool/call', seq: 1, data: { turn: 0, step: 1, callId: 'c1', name: 'read', arguments: '{}' } } },
+      { type: 'event', event: { type: 'tool/result', seq: 2, data: { message: { toolCallId: 'c1' } } } },
+      { type: 'event', event: { type: 'tool/call', seq: 3, data: { turn: 0, step: 2, callId: 'c2', name: 'write', arguments: '{}' } } },
+    ] } })
+    const deps: AgentSwarmDeps = {
+      ...fake.deps,
+      teamOf: () => ({
+        members: [{ id: 'mate', name: '写手', role: 'teammate', phase: 'running' }],
+        tasks: [],
+      }),
+    }
+    const controller = createAgentSwarmController(deps, 'root')
+    await flush()
+    const mate = controller.state().agents.find(a => a.id === 'mate')
+    expect(mate?.toolCount).toBe(2)
+    controller.dispose()
+  })
+})

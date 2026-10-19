@@ -60,6 +60,8 @@ export interface AgentSwarmAgent {
   readonly tail: LiveTail | null
   /** Team role, when this agent is a member of the session's agent team. */
   readonly role?: 'lead' | 'teammate'
+  /** Tools this agent has run (from its own window). */
+  readonly toolCount: number
 }
 
 export interface AgentSwarmState {
@@ -113,6 +115,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
   const listeners = new Set<() => void>()
   const windows = new Map<string, Held>()
   const tails = new Map<string, LiveTail | null>()
+  const toolCounts = new Map<string, number>()
   const todos = new Map<string, readonly SwarmTodo[]>()
   const heat = new Map<string, number>()
   const failed = new Set<string>()
@@ -180,6 +183,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
     knownWindows.set(id, source.entries())
     const tail = liveTailFromEntries(source.entries())
     tails.set(id, tail)
+    toolCounts.set(id, activityFromEntries(source.entries()).tools.length)
     const nodeTodos = todosFromEntries(source.entries())
     if (nodeTodos === null) todos.delete(id)
     else todos.set(id, nodeTodos)
@@ -262,6 +266,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
         status,
         snippet: tail === null ? null : tailSnippet(tail, 46),
         tail,
+        toolCount: toolCounts.get(id) ?? 0,
         ...(member === undefined ? {} : { role: member.role }),
       })
     }
@@ -278,6 +283,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
         status: archived ? 'idle' : member.phase === 'failed' ? 'failed' : member.phase === 'running' ? 'running' : 'idle',
         snippet: null,
         tail: null,
+        toolCount: 0,
         role: member.role,
       })
     }
@@ -316,6 +322,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
       for (const id of [...windows.keys()]) closeWindow(id)
       tails.clear()
       todos.clear()
+      toolCounts.clear()
       heat.clear()
     },
   }

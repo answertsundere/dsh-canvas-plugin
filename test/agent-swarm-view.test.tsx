@@ -19,8 +19,8 @@ const swarmState = (over: Partial<AgentSwarmState> = {}): AgentSwarmState => ({
   team: null,
   rootConclusion: null,
   agents: [
-    { id: 'a', label: '检索器', depth: 1, status: 'streaming', snippet: { label: '推理', text: '正在翻资料' }, tail: null },
-    { id: 'b', label: '写手', depth: 1, status: 'idle', snippet: null, tail: null },
+    { id: 'a', label: '检索器', depth: 1, status: 'streaming', snippet: { label: '推理', text: '正在翻资料' }, tail: null, toolCount: 3 },
+    { id: 'b', label: '写手', depth: 1, status: 'idle', snippet: null, tail: null, toolCount: 0 },
   ],
   edges: [
     { from: 'root', to: 'a' },
@@ -407,7 +407,7 @@ describe('rounds 8-9', () => {
     const onOpenRoot = vi.fn()
     const state = activityState({
       agents: [
-        { id: 'a', label: '检索器', depth: 1, status: 'failed', snippet: null, tail: null },
+        { id: 'a', label: '检索器', depth: 1, status: 'failed', snippet: null, tail: null, toolCount: 0 },
       ],
     })
     render(<AgentSwarmView swarm={state} onClose={() => {}} onOpenRoot={onOpenRoot} nowMs={NOW} />)
