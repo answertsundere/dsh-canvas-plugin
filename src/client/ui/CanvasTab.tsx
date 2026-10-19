@@ -247,6 +247,32 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
     setFork({ rowIndex: lastIdx, atSeq })
   }, [pendingForkFor, effectiveDetail])
 
+  // Keyboard pan/zoom: arrow keys pan, +/- zooms. Active only when the focus
+  // is not in a text field, so typing never moves the view.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const target = event.target as HTMLElement | null
+      if (target !== null && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return
+        if (canvas === undefined) return
+      const PAN = 60
+      switch (event.key) {
+        case 'ArrowLeft': canvas.onViewChange({ ...canvas.view, x: canvas.view.x + PAN }); break
+        case 'ArrowRight': canvas.onViewChange({ ...canvas.view, x: canvas.view.x - PAN }); break
+        case 'ArrowUp': canvas.onViewChange({ ...canvas.view, y: canvas.view.y + PAN }); break
+        case 'ArrowDown': canvas.onViewChange({ ...canvas.view, y: canvas.view.y - PAN }); break
+        case '+': case '=':
+          canvas.onViewChange({ ...canvas.view, scale: Math.min(2, canvas.view.scale * 1.12) }); break
+        case '-': case '_':
+          canvas.onViewChange({ ...canvas.view, scale: Math.max(0.4, canvas.view.scale / 1.12) }); break
+        default:
+          return
+      }
+      event.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => { window.removeEventListener('keydown', onKey) }
+  }, [canvas])
+
   // Esc unwinds layer by layer: context menu first, then the swarm, then the
   // selection — one press per layer, never all at once.
   useEffect(() => {

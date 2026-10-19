@@ -759,3 +759,25 @@ describe('minimap frame', () => {
     expect(frame.style.width.endsWith('px')).toBe(true)
   })
 })
+
+describe('keyboard pan and zoom', () => {
+  it('arrow keys pan the view', () => {
+    const onViewChange = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({ onViewChange })} />)
+    const input = container.querySelector('[data-canvas-search]') as HTMLElement
+    input.blur()
+    fireEvent.keyDown(window, { key: 'ArrowLeft' })
+    expect(onViewChange).toHaveBeenCalled()
+    const view = onViewChange.mock.calls.at(-1)?.[0] as CanvasView
+    expect(view.x).toBe(60)
+  })
+
+  it('typing in the search field never pans', () => {
+    const onViewChange = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({ onViewChange })} />)
+    onViewChange.mockClear()
+    const input = container.querySelector('[data-canvas-search]') as HTMLElement
+    fireEvent.keyDown(input, { key: 'ArrowLeft' })
+    expect(onViewChange).not.toHaveBeenCalled()
+  })
+})
