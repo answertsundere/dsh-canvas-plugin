@@ -580,6 +580,19 @@ describe('drag threshold', () => {
     fireEvent.click(document.querySelector('[data-canvas-node="a"]') as Element)
     expect(onSelect).toHaveBeenCalledWith('a')
   })
+
+  it('dragging on empty space pans the view', () => {
+    const onViewChange = vi.fn()
+    const { container } = render(<CanvasTab canvas={model({ onViewChange })} />)
+    const surface = container.querySelector('[data-canvas-surface]') as HTMLElement
+    fireEvent.mouseDown(surface, { clientX: 400, clientY: 300 })
+    fireEvent.mouseMove(surface, { clientX: 460, clientY: 340 })
+    fireEvent.mouseUp(surface, { clientX: 460, clientY: 340 })
+    expect(onViewChange).toHaveBeenCalled()
+    const view = onViewChange.mock.calls.at(-1)?.[0] as CanvasView
+    expect(view.x).toBe(60)   // 400 + (460-400) = viewX + dx
+    expect(view.y).toBe(40)   // 300 + (340-300) = viewY + dy
+  })
 })
 describe('minimap', () => {
   it('renders a corner overview with one dot per node and recenters on click', () => {
