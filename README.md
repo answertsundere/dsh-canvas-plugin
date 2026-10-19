@@ -1,6 +1,9 @@
 # dsh-canvas
 
-A conversation-branch canvas for DeepSeek Harness: draw the current workspace's session lineage as a full-bleed canvas, fork from any message, run two approaches in parallel, and compare them deterministically.
+[![ci](https://github.com/answertsundere/dsh-canvas-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/answertsundere/dsh-canvas-plugin/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+A conversation-branch canvas for DeepSeek Harness: draw the current workspace's session lineage as a full-bleed canvas, fork from any message, run two approaches in parallel, and compare them deterministically. 中文说明见 [`README.zh-CN.md`](README.zh-CN.md)。
 
 > Target: DSH `0.2.0-rc.2`. Every DSH API used here was verified against the local checkout (commit `639ed01539`), not against online docs.
 
@@ -22,9 +25,27 @@ DSH supports forking natively and the sidebar lists sessions, but:
 - **Live streaming output** — a running branch's in-flight assistant stream is visible on the canvas: the node card shows the newest line (reasoning / answer / tool), and the selected branch's detail panel shows the full live reasoning and answer text, updated per chunk and folded into the turn list when the durable message settles. While a stream is visible the status badge is driven by it (thinking vs tool), so a running node is no longer a guess.
 - **Agent swarm web** — the ⌖ corner button on a node card opens that session's own live view: the parent agent at the center, its subagents on the ring around it. When an agent emits, its spoke lights up and a glowing dot crawls toward the parent (spider-web effect), with the agent's newest line on its chip. The roster comes from the session log's `subagent/catalog` events, so a freshly spawned agent joins the web instantly.
 
+## Requirements
+
+- DeepSeek Harness (desktop app or CLI), pinned to `0.2.0-rc.2` — see the [version matrix](#version-matrix)
+- Node.js ≥ 22.19, pnpm 10+ (`corepack enable`), Git
+
 ## Install
 
-Desktop (recommended):
+The plugin is distributed from source for now — the npm name is reserved but not yet published (see the [publish blocker](#️-known-publish-blocker)).
+
+```bash
+git clone https://github.com/answertsundere/dsh-canvas-plugin
+cd dsh-canvas-plugin
+pnpm install
+pnpm run build
+```
+
+Desktop app (recommended):
+
+```bash
+node scripts/install-local.mjs --profile desktop
+```
 
 ```bash
 node scripts/install-local.mjs --profile desktop
@@ -37,10 +58,11 @@ The standalone CLI **cannot** install the desktop profile — it hard-rejects `-
 Web profile (development):
 
 ```bash
-node scripts/install-local.mjs                      # web-0.1.7 by default
-node scripts/install-local.mjs --profile web
+node scripts/install-local.mjs --profile web --repo <path to a DSH checkout>
 dsh web --port 3090 --no-open
 ```
+
+`--repo` (or the `DSH_REPO` env var) points at the checkout the DSH CLI boots from; it defaults to the maintainer's `D:/deepseek harness`. The desktop path needs no checkout — it uses the app's own carrier CLI.
 
 ## Explicit v1 limits
 
@@ -62,7 +84,7 @@ See [`docs/compat.md`](docs/compat.md) and [`docs/superpowers/m0-verification.md
 
 ## ⚠️ Known publish blocker
 
-`dsh-canvas` is **already taken on npm** (`0.0.1`, described as "Infinite canvas for the DeepSeek Harness - name reserved", repo `dushaobindoudou/dsh-canvas`). Publishing requires renaming to `@<scope>/dsh-canvas` and updating `package.json` `name`, the `name:` in `cordis.patch.yml`, and `PLUGIN_ID` in `tsdown.config.ts`.
+`dsh-canvas` is **already taken on npm** (`0.0.1`, described as "Infinite canvas for the DeepSeek Harness - name reserved", repo `dushaobindoudou/dsh-canvas`). Publishing requires renaming to `@<scope>/dsh-canvas` and updating `package.json` `name`, the `name:` in `cordis.patch.yml`, and `PLUGIN_ID` in `tsdown.config.ts`. Until that decision is made, this GitHub repository is the distribution channel.
 
 **Do not rename during local development**: the loader id changes, the installed profile row stops matching, and the verified M0 install breaks.
 
@@ -83,6 +105,10 @@ Two traps that make changes **silently not apply** — see [`docs/superpowers/m0
 
 1. A `file:` dependency is **copied**, not linked, and pnpm skips the copy while spec/version are unchanged — so a rebuild must delete the profile's copy first (the install script does).
 2. pnpm 11's `pnpm-workspace.yaml` carries unanswered `allowBuilds` placeholders; until answered, `pnpm add` fails and the DSH plugin manager swallows pnpm's stderr.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the setup, the verify loop, and the project's ground rules. Bug reports are welcome — include your DSH version, OS, target profile, and the failing command's full output.
 
 ## License
 

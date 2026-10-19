@@ -18,7 +18,11 @@ import { existsSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 
-const REPO = 'D:/deepseek harness'
+// The web-profile install boots the DSH CLI out of a checkout of the harness
+// repo. The maintainer's checkout lives at D:/deepseek harness; elsewhere pass
+// --repo <path> or set DSH_REPO. The desktop path needs no checkout — it uses
+// the app's own carrier CLI under LOCALAPPDATA.
+let repo = process.env.DSH_REPO ?? 'D:/deepseek harness'
 const DEFAULT_PROFILE = 'web-0.1.7'
 const PORT = '3090'
 
@@ -32,6 +36,8 @@ const usage = () => {
     'command that boots that profile.',
     '',
     '  --profile <name>   target profile (default: ' + DEFAULT_PROFILE + ')',
+    '  --repo <path>      DSH checkout to boot the CLI from, for web profiles',
+    '                     (default: D:/deepseek harness, or $DSH_REPO)',
     '  --help             print this help and exit',
     '',
     'Default profile ' + DEFAULT_PROFILE + ' bundles dsh-base, dsh-web-app, the agent-team',
@@ -58,6 +64,12 @@ for (let i = 0; i < argv.length; i++) {
   } else if (arg.startsWith('--profile=')) {
     profile = arg.slice('--profile='.length)
     if (profile === '') fail('--profile needs a name')
+  } else if (arg === '--repo') {
+    repo = argv[++i] ?? ''
+    if (repo === '') fail('--repo needs a path')
+  } else if (arg.startsWith('--repo=')) {
+    repo = arg.slice('--repo='.length)
+    if (repo === '') fail('--repo needs a path')
   } else {
     fail('unknown argument: ' + arg)
   }
@@ -94,8 +106,11 @@ if (profile === DESKTOP_PROFILE) {
   execFileSync(`"${desktopCli}" plugin --profile ${profile} add "${pkg}"`, { stdio: 'inherit', shell: true })
   console.log('installed into the desktop profile; restart the app so it reads the new bundle row')
 } else {
+  if (!existsSync(repo)) {
+    fail('no DSH checkout at ' + repo + ' — pass --repo <path> or set DSH_REPO')
+  }
   execFileSync('corepack', ['pnpm', 'dsh', 'plugin', '--profile', profile, 'add', pkg],
-    { cwd: REPO, stdio: 'inherit', shell: true })
+    { cwd: repo, stdio: 'inherit', shell: true })
   console.log('installed into profile "' + profile + '"; boot it with: corepack pnpm dsh '
     + profile + ' --port ' + PORT + ' --no-open')
 }

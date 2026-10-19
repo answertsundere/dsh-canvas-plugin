@@ -1,6 +1,9 @@
 # dsh-canvas
 
-DeepSeek Harness 的会话分支画布插件：把当前工作区的会话血缘画成一张全幅画布，可以从任意一条消息分叉、并行跑两个方案、再确定性地对比它们。
+[![ci](https://github.com/answertsundere/dsh-canvas-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/answertsundere/dsh-canvas-plugin/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+DeepSeek Harness 的会话分支画布插件：把当前工作区的会话血缘画成一张全幅画布，可以从任意一条消息分叉、并行跑两个方案、再确定性地对比它们。English readme: [`README.md`](README.md)。
 
 > 目标版本：DSH `0.2.0-rc.2`。所有 DSH API 都是对着本地 checkout（commit `639ed01539`）核实的，不是对着线上文档。
 
@@ -22,9 +25,27 @@ DSH 原生支持会话分叉，侧边栏也能看到会话列表，但：
 - **实时流式输出**：运行中的分支在画布上实时可见——节点卡显示正在生成的最新一行（推理／正文／工具），选中分支的详情面板显示完整的实时推理流与正文，逐 chunk 更新，落地后自动并入轮次列表。有流可见时状态徽章由流内容驱动（思考中／工具执行），运行中的节点不再是猜测。
 - **Agent 实况蛛网**：点节点卡角上的「⌖」进入该会话的专属实况视图——父 agent 居中、子代理环绕成网。哪个 agent 在出活，哪个辐条就会亮起并有光点向父节点爬动（蜘蛛网效果），芯片上同步显示它正在生成的最新一行。子代理清单来自会话日志里的 `subagent/catalog` 事件，新 agent 出现即时上网，无需刷新。
 
+## 环境要求
+
+- DeepSeek Harness（桌面 App 或 CLI），锁定 `0.2.0-rc.2`——见[版本矩阵](#版本矩阵)
+- Node.js ≥ 22.19、pnpm 10+（`corepack enable`）、Git
+
 ## 安装
 
+插件目前以源码形式分发——npm 上的名字已被预留但尚未发布（见[发布阻塞](#️-发布前的已知阻塞)）。
+
+```bash
+git clone https://github.com/answertsundere/dsh-canvas-plugin
+cd dsh-canvas-plugin
+pnpm install
+pnpm run build
+```
+
 桌面版（推荐）：
+
+```bash
+node scripts/install-local.mjs --profile desktop
+```
 
 ```bash
 node scripts/install-local.mjs --profile desktop
@@ -37,10 +58,11 @@ node scripts/install-local.mjs --profile desktop
 Web profile（开发用）：
 
 ```bash
-node scripts/install-local.mjs                      # 默认 web-0.1.7
-node scripts/install-local.mjs --profile web
+node scripts/install-local.mjs --profile web --repo <DSH checkout 路径>
 dsh web --port 3090 --no-open
 ```
+
+`--repo`（或环境变量 `DSH_REPO`）指向用于启动 DSH CLI 的 checkout，默认是维护者本机的 `D:/deepseek harness`。桌面路径不需要 checkout——它用的是 App 自带的 carrier CLI。
 
 ## v1 明确不做
 
@@ -68,6 +90,8 @@ npm 上的 `dsh-canvas` **已被占用**（`0.0.1`，描述为 "Infinite canvas 
 - `cordis.patch.yml` 里的 `name:`
 - `tsdown.config.ts` 的 `PLUGIN_ID`（决定 `window.__ModuleLoader__.load({ id })`）
 
+在这个决定做出之前，本 GitHub 仓库就是分发渠道。
+
 **不要在本地开发阶段改名**：`id` 一改，已装进 profile 的插件行就对不上，M0 验证过的安装会失效。
 
 ## 开发
@@ -87,6 +111,10 @@ env -u NODE_OPTIONS -u CODEBUDDY_SAFE_DELETE_BULK_GUARD node scripts/m0-check.mj
 
 1. `file:` 依赖是**拷贝**不是链接，且 spec/version 不变就跳过复制 → 重建后必须删掉 profile 里的副本再装（脚本已处理）。
 2. pnpm 11 的 `pnpm-workspace.yaml` 里 `allowBuilds` 占位符没回答，`pnpm add` 会失败，而 DSH 的 plugin manager 会吞掉 pnpm 的 stderr。
+
+## 参与贡献
+
+环境搭建、验证流程与项目铁律见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。欢迎提 bug——请附上 DSH 版本、操作系统、目标 profile，以及失败命令的完整输出。
 
 ## 许可证
 
