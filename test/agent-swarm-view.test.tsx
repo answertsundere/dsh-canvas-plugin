@@ -603,3 +603,22 @@ describe('member conclusion chips', () => {
     expect(document.querySelector('[data-swarm-agent-conclusion]')?.textContent).toContain('链接全部校验通过')
   })
 })
+
+import { toolLabel } from '../src/client/swarm/swarm-model.ts'
+
+describe('Chinese tool labels', () => {
+  it('tool chips show Chinese label prominently with raw name muted', () => {
+    const state = activityState({
+      activity: {
+        turnCount: 0, openTurn: false, currentTurn: null,
+        tools: [{ id: 'c1', name: 'pwsh', status: 'pending', turn: 0, preview: 'npm test' }],
+        pendingToolId: 'c1',
+      },
+      toolLayout: { maxRadius: 400, positions: new Map([['c1', { x: 0, y: -300 }]]) },
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    const chip = document.querySelector('[data-swarm-tool="c1"]')
+    expect(chip?.textContent).toContain('终端')
+    expect(chip?.textContent).toContain('pwsh')
+  })
+})

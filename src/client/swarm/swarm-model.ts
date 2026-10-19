@@ -609,3 +609,34 @@ export function teamTasksByOwner(snapshot: unknown): ReadonlyMap<string, readonl
   }
   return byOwner
 }
+
+/**
+ * Chinese labels for known DSH tool families. A tool whose name matches a
+ * pattern gets a readable Chinese label; unknown tools fall back to the raw
+ * name so nothing becomes less readable than before.
+ */
+const TOOL_LABELS: readonly { readonly pattern: RegExp; readonly zh: string }[] = [
+  { pattern: /^(pwsh|powershell|shell|bash|cmd|terminal|subprocess)/i, zh: '终端' },
+  { pattern: /^job_/i, zh: '后台任务' },
+  { pattern: /^(read|cat|view|open|ls|list)/i, zh: '读取' },
+  { pattern: /^(write|edit|create|patch|apply)/i, zh: '写入' },
+  { pattern: /^(grep|search|find|query)/i, zh: '搜索' },
+  { pattern: /^(todo|task|plan)/i, zh: '任务' },
+  { pattern: /^(fetch|web|http|curl)/i, zh: '网络' },
+  { pattern: /^(send_message|team_message)/i, zh: '发消息' },
+  { pattern: /^(spawn_teammate|team_create)/i, zh: '创建队友' },
+  { pattern: /^(team_task_list|team_task)/i, zh: '团队任务' },
+  { pattern: /^(wait_agent|agent_wait)/i, zh: '等待' },
+  { pattern: /^(list_agents|list_agent)/i, zh: '列出成员' },
+  { pattern: /^(working_directory|cwd)/i, zh: '工作目录' },
+  { pattern: /^(glob|glob_file)/i, zh: '文件匹配' },
+  { pattern: /^(update_goal|goal)/i, zh: '更新目标' },
+]
+
+/** Maps a raw tool name to its Chinese label; unknown tools keep the raw name. */
+export function toolLabel(name: string): string {
+  for (const { pattern, zh } of TOOL_LABELS) {
+    if (pattern.test(name)) return zh
+  }
+  return name
+}

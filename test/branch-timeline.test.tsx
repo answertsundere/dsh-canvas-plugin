@@ -316,10 +316,10 @@ describe('tool names in rows', () => {
       onFork={() => {}}
     />)
     const names = document.querySelector('[data-row-tool-names]')
-    expect(names?.textContent).toContain('read')
-    expect(names?.textContent).toContain('pwsh')
+    expect(names?.textContent).toContain('读取')
+    expect(names?.textContent).toContain('终端')
     const errSpan = names?.querySelector('[data-row-tool-error="true"]')
-    expect(errSpan?.textContent).toContain('pwsh')
+    expect(errSpan?.textContent).toContain('终端')
   })
 
   it('a turn without tools shows no name list', () => {
@@ -358,5 +358,17 @@ describe('timeline autoscroll', () => {
     // jsdom has no layout, so scrollHeight is 0 — assignment still lands.
     timeline.scrollTop = 120
     expect(timeline.scrollTop).toBe(120)
+  })
+})
+
+describe('Chinese tool labels in detail rows', () => {
+  it('rows show Chinese tool labels', () => {
+    render(<BranchTimeline
+      turns={[{ index: 0, userMessage: '问', tools: [
+        { name: 'pwsh', status: 'ok', preview: 'npm test' },
+      ], firstSeq: 1, lastSeq: 9, synthetic: false }]}
+      inheritedCount={0} cwdWarning={false} onFork={() => {}}
+    />)
+    expect(document.querySelector('[data-row-tool-names]')?.textContent).toContain('终端')
   })
 })

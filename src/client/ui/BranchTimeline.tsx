@@ -2,6 +2,7 @@ import { useState, type FC } from 'react'
 import type { LiveTail } from '../live/live-tail.ts'
 import type { BranchTurn } from '../../shared/contracts.ts'
 import { theme } from '../theme.ts'
+import { toolLabel } from '../swarm/swarm-model.ts'
 
 export interface BranchTimelineProps {
   readonly turns: readonly BranchTurn[]
@@ -160,7 +161,7 @@ export const BranchTimeline: FC<BranchTimelineProps> = ({ turns, inheritedCount,
                     style={{ color: tool.status === 'error' ? '#e0554d' : 'inherit' }}
                   >
                     {index > 0 && ' · '}
-                    {tool.name}
+                    <span style={{ fontWeight: 600 }}>{toolLabel(tool.name)}</span>
                     {tool.preview !== undefined && (
                       <span
                         data-row-tool-args

@@ -10,6 +10,7 @@ import {
   SWARM_PALETTES,
   sweepProgress,
   toolGlyph,
+  toolLabel,
   turnGroups,
   type SwarmTodo,
 } from '../swarm/swarm-model.ts'
@@ -686,11 +687,12 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                   species="device"
                 />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {tool.name}
+                  <span style={{ fontWeight: 600 }}>{toolLabel(tool.name)}</span>
                   {group.count > 1 && <span data-swarm-tool-count> ×{group.count}</span>}
                   {tool.preview !== undefined && (
-                    <span style={{ color: theme.muted }}> {tool.preview}</span>
+                    <span style={{ color: theme.muted, marginLeft: 4 }}> {tool.preview}</span>
                   )}
+                  <span style={{ color: theme.muted, opacity: 0.6, marginLeft: 4, fontSize: 10 }}>{tool.name}</span>
                 </span>
                 <span style={{ flex: '0 0 auto', color: failed ? '#e0554d' : theme.muted }}>
                   {pending ? '…' : failed ? '✗' : '✓'}

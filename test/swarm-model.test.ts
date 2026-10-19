@@ -493,3 +493,23 @@ describe('teamTasksByOwner', () => {
     expect(teamTasksByOwner({ projectionsBySession: { a: { values: { agentTeam: { tasks: 'nope' } } } } }).size).toBe(0)
   })
 })
+
+import { toolLabel } from '../src/client/swarm/swarm-model.ts'
+
+describe('toolLabel', () => {
+  it('maps known tool families to Chinese labels', () => {
+    expect(toolLabel('pwsh')).toBe('终端')
+    expect(toolLabel('job_output')).toBe('后台任务')
+    expect(toolLabel('read')).toBe('读取')
+    expect(toolLabel('write')).toBe('写入')
+    expect(toolLabel('grep')).toBe('搜索')
+    expect(toolLabel('send_message')).toBe('发消息')
+    expect(toolLabel('spawn_teammate')).toBe('创建队友')
+    expect(toolLabel('wait_agent')).toBe('等待')
+    expect(toolLabel('working_directory')).toBe('工作目录')
+  })
+
+  it('unknown tools keep the raw name', () => {
+    expect(toolLabel('mystery_tool')).toBe('mystery_tool')
+  })
+})
