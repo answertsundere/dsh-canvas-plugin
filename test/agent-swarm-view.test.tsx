@@ -19,8 +19,8 @@ const swarmState = (over: Partial<AgentSwarmState> = {}): AgentSwarmState => ({
   team: null,
   rootConclusion: null,
   agents: [
-    { id: 'a', label: '检索器', depth: 1, status: 'streaming', snippet: { label: '推理', text: '正在翻资料' }, tail: null, toolCount: 3 },
-    { id: 'b', label: '写手', depth: 1, status: 'idle', snippet: null, tail: null, toolCount: 0 },
+    { id: 'a', label: '检索器', depth: 1, status: 'streaming', snippet: { label: '推理', text: '正在翻资料' }, tail: null, toolCount: 3, conclusion: null },
+    { id: 'b', label: '写手', depth: 1, status: 'idle', snippet: null, tail: null, toolCount: 0, conclusion: null },
   ],
   edges: [
     { from: 'root', to: 'a' },
@@ -407,7 +407,7 @@ describe('rounds 8-9', () => {
     const onOpenRoot = vi.fn()
     const state = activityState({
       agents: [
-        { id: 'a', label: '检索器', depth: 1, status: 'failed', snippet: null, tail: null, toolCount: 0 },
+        { id: 'a', label: '检索器', depth: 1, status: 'failed', snippet: null, tail: null, toolCount: 0, conclusion: null },
       ],
     })
     render(<AgentSwarmView swarm={state} onClose={() => {}} onOpenRoot={onOpenRoot} nowMs={NOW} />)
@@ -577,5 +577,29 @@ describe('chip keyboard access', () => {
     expect(chip.getAttribute('role')).toBe('button')
     fireEvent.keyDown(chip, { key: 'Enter' })
     expect(onSelectAgent).toHaveBeenCalledWith('a')
+  })
+})
+
+describe('member conclusion chips', () => {
+  it('agent chips show their own conclusion', () => {
+    const state = activityState({
+      agents: [
+        { id: 'a', label: '检索器', depth: 1, status: 'idle', snippet: null, tail: null, toolCount: 0, conclusion: '链接全部校验通过' },
+      ],
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-agent-conclusion]')?.textContent).toContain('链接全部校验通过')
+  })
+})
+
+describe('member conclusion chips', () => {
+  it('agent chips show their own conclusion', () => {
+    const state = activityState({
+      agents: [
+        { id: 'a', label: '检索器', depth: 1, status: 'idle', snippet: null, tail: null, toolCount: 0, conclusion: '链接全部校验通过' },
+      ],
+    })
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(document.querySelector('[data-swarm-agent-conclusion]')?.textContent).toContain('链接全部校验通过')
   })
 })

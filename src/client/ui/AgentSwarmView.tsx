@@ -623,6 +623,14 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                     {agent.snippet.text}
                   </div>
                 )}
+                {agent.conclusion !== null && (
+                  <div
+                    data-swarm-agent-conclusion
+                    style={{ color: theme.muted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 190 }}
+                  >
+                    结论：{agent.conclusion}
+                  </div>
+                )}
                 {(() => {
                   const agentTodos = swarm.todos.get(agent.id)
                   return agentTodos === undefined ? null : <TodoList items={agentTodos} limit={4} />

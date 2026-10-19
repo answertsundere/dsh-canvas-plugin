@@ -398,3 +398,43 @@ describe('agent tool counts', () => {
     controller.dispose()
   })
 })
+
+describe('member conclusions', () => {
+  it('a member chip carries its own latest conclusion', async () => {
+    const fake = makeDeps({ windows: { mate: [
+      { type: 'event', event: { type: 'assistant/message', seq: 1, data: { turn: 0, step: 1, message: { content: [{ type: 'text', text: '接口已就绪' }] } } } },
+    ] } })
+    const deps: AgentSwarmDeps = {
+      ...fake.deps,
+      teamOf: () => ({
+        members: [{ id: 'mate', name: '写手', role: 'teammate', phase: 'inactive' }],
+        tasks: [],
+      }),
+    }
+    const controller = createAgentSwarmController(deps, 'root')
+    await flush()
+    const mate = controller.state().agents.find(a => a.id === 'mate')
+    expect(mate?.conclusion).toBe('接口已就绪')
+    controller.dispose()
+  })
+})
+
+describe('member conclusions', () => {
+  it('a member chip carries its own latest conclusion', async () => {
+    const fake = makeDeps({ windows: { mate: [
+      { type: 'event', event: { type: 'assistant/message', seq: 1, data: { turn: 0, step: 1, message: { content: [{ type: 'text', text: '接口已就绪' }] } } } },
+    ] } })
+    const deps: AgentSwarmDeps = {
+      ...fake.deps,
+      teamOf: () => ({
+        members: [{ id: 'mate', name: '写手', role: 'teammate', phase: 'inactive' }],
+        tasks: [],
+      }),
+    }
+    const controller = createAgentSwarmController(deps, 'root')
+    await flush()
+    const mate = controller.state().agents.find(a => a.id === 'mate')
+    expect(mate?.conclusion).toBe('接口已就绪')
+    controller.dispose()
+  })
+})

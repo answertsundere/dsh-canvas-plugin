@@ -80,7 +80,7 @@ const CANVAS_CSS = `
   background-size: 24px 24px;
 }
 /* Node cards lift on hover — the standard affordance for "this is grabbable". */
-.dsh-node-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+.dsh-node-card { transition: transform 0.15s ease, box-shadow 0.15s ease, left 0.3s ease, top 0.3s ease; }
 [data-canvas-node]:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4); }
 /* Threads feeding working sessions flow, like the swarm's silk. */
 .dsh-edge-busy { stroke-dasharray: 6 6; animation: dshDashFlow 0.9s linear infinite; }
@@ -435,6 +435,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
 
   const now = Date.now()
   const needle = query.trim().toLowerCase()
+  const [legendVisible, setLegendVisible] = useState(false)
   const runningCount = [...canvas.graph.nodes.values()]
     .filter(node => {
       const kind = canvas.statusOf(node.id).kind

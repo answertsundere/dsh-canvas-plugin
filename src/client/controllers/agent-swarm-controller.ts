@@ -10,7 +10,7 @@ import {
   type SessionActivity,
   type SwarmTodo,
 } from '../swarm/swarm-model.ts'
-import { conclusionFromEvents, inheritedPrefixLength, type SessionEventLike } from '../compare/branch-segment.ts'
+import { inheritedPrefixLength, conclusionFromEvents, type SessionEventLike } from '../compare/branch-segment.ts'
 import { liveTailFromEntries, tailSnippet, type LiveTail, type TailSnippet } from '../live/live-tail.ts'
 import type { LiveWindowLike } from './graph-controller.ts'
 
@@ -62,6 +62,8 @@ export interface AgentSwarmAgent {
   readonly role?: 'lead' | 'teammate'
   /** Tools this agent has run (from its own window). */
   readonly toolCount: number
+  /** The member's own latest conclusion, when one exists. */
+  readonly conclusion: string | null
 }
 
 export interface AgentSwarmState {
@@ -116,6 +118,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
   const windows = new Map<string, Held>()
   const tails = new Map<string, LiveTail | null>()
   const toolCounts = new Map<string, number>()
+  const conclusions = new Map<string, string | null>()
   const todos = new Map<string, readonly SwarmTodo[]>()
   const heat = new Map<string, number>()
   const failed = new Set<string>()
@@ -184,6 +187,13 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
     const tail = liveTailFromEntries(source.entries())
     tails.set(id, tail)
     toolCounts.set(id, activityFromEntries(source.entries()).tools.length)
+    {
+      const flat: SessionEventLike[] = source.entries()
+        .filter(entry => entry.type === 'event')
+        .map(entry => ({ seq: Number(entry.event.seq), type: entry.event.type, data: entry.event.data }))
+      const inherited = inheritedPrefixLength(flat)
+      conclusions.set(id, conclusionFromEvents(flat.filter(event => event.seq >= inherited)))
+    }
     const nodeTodos = todosFromEntries(source.entries())
     if (nodeTodos === null) todos.delete(id)
     else todos.set(id, nodeTodos)
@@ -267,6 +277,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
         snippet: tail === null ? null : tailSnippet(tail, 46),
         tail,
         toolCount: toolCounts.get(id) ?? 0,
+        conclusion: conclusions.get(id) ?? null,
         ...(member === undefined ? {} : { role: member.role }),
       })
     }
@@ -284,6 +295,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
         snippet: null,
         tail: null,
         toolCount: 0,
+        conclusion: null,
         role: member.role,
       })
     }
@@ -322,6 +334,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
       for (const id of [...windows.keys()]) closeWindow(id)
       tails.clear()
       todos.clear()
+      conclusions.clear()
       toolCounts.clear()
       heat.clear()
     },
