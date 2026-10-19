@@ -5,6 +5,10 @@
 
 DeepSeek Harness 的会话分支画布插件：把当前工作区的会话血缘画成一张全幅画布，可以从任意一条消息分叉、并行跑两个方案、再确定性地对比它们。English readme: [`README.md`](README.md)。
 
+| 血缘画布——任意消息分叉，分支实时可见 | Agent 实况蛛网——每个子代理在线工作，出活即亮 |
+|---|---|
+| ![血缘画布](.github/assets/canvas-overview.png) | ![Agent 实况蛛网](.github/assets/swarm-warroom.png) |
+
 > 目标版本：DSH `0.2.0-rc.2`。所有 DSH API 都是对着本地 checkout（commit `639ed01539`）核实的，不是对着线上文档。
 
 ## 它解决什么

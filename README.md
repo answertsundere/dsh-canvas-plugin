@@ -5,6 +5,10 @@
 
 A conversation-branch canvas for DeepSeek Harness: draw the current workspace's session lineage as a full-bleed canvas, fork from any message, run two approaches in parallel, and compare them deterministically. 中文说明见 [`README.zh-CN.md`](README.zh-CN.md)。
 
+| The lineage canvas — fork from any message, watch branches run live | The agent war room — every subagent on the web, pulsing as it works |
+|---|---|
+| ![Lineage canvas](.github/assets/canvas-overview.png) | ![Agent war room](.github/assets/swarm-warroom.png) |
+
 > Target: DSH `0.2.0-rc.2`. Every DSH API used here was verified against the local checkout (commit `639ed01539`), not against online docs.
 
 ## What it solves
