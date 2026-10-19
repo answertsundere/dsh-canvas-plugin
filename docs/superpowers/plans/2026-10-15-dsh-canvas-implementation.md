@@ -1042,6 +1042,16 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34l: rounds 49–51 — persistent collapse, hover spokes, empty state (2026-10-17)
+
+- **Round 49 (persistent collapse)**: subtree collapse state moved from tab-local useState into the controller — it survives tab switches; the fixture needs a stateful Harness because the fixture's toggle must force re-renders the way notify() does.
+- **Round 50 (hover spokes)**: hovering a member robot highlights its spoke at full text stroke.
+- **Round 51 (empty state)**: an empty web explains itself — 尚无子代理，通过对话创建后出现在这里.
+
+**Numbers:** 18 files / **378 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34k: rounds 46–48 — legend, layout glide, member conclusions (2026-10-17)
 
 - **Round 46 (legend)**: collapsible status legend in the toolbar — 思考中/工具执行/空闲/失败 four-color dots.
