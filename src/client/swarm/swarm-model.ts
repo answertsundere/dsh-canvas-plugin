@@ -574,3 +574,35 @@ export function orderTeamTasks<T extends { readonly status: string }>(tasks: rea
     .sort((a, b) => a.rank - b.rank || a.index - b.index)
     .map(entry => entry.task)
 }
+
+/**
+ * In-progress shared task subjects per owning session, folded from every
+ * projected team in the list snapshot — the canvas shows these on member
+ * cards so the board and the map tell the same story.
+ */
+export function teamTasksByOwner(snapshot: unknown): ReadonlyMap<string, readonly string[]> {
+  const byOwner = new Map<string, readonly string[]>()
+  if (snapshot === null || typeof snapshot !== 'object') return byOwner
+  const projections = (snapshot as { projectionsBySession?: unknown }).projectionsBySession
+  if (projections === null || typeof projections !== 'object') return byOwner
+  for (const entry of Object.values(projections as Record<string, unknown>)) {
+    if (entry === null || typeof entry !== 'object') continue
+    const values = (entry as { values?: unknown }).values
+    if (values === null || typeof values !== 'object') continue
+    const team = (values as Record<string, unknown>)['agentTeam']
+    if (team === null || typeof team !== 'object') continue
+    const tasks = (team as { tasks?: unknown }).tasks
+    if (!Array.isArray(tasks)) continue
+    for (const task of tasks) {
+      if (task === null || typeof task !== 'object') continue
+      const record = task as Record<string, unknown>
+      if (record['status'] !== 'in_progress') continue
+      const owner = record['ownerId']
+      const subject = record['subject']
+      if (typeof owner !== 'string' || typeof subject !== 'string') continue
+      const current = byOwner.get(owner)
+      byOwner.set(owner, current === undefined ? [subject] : [...current, subject])
+    }
+  }
+  return byOwner
+}

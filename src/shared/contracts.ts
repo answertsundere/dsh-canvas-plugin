@@ -15,6 +15,8 @@ export interface CanvasNode {
   readonly depth: number
   /** Set when this session is a member of the workspace's agent team. */
   readonly teamRole?: 'lead' | 'teammate'
+  /** In-progress shared task subjects owned by this session. */
+  readonly teamTasks?: readonly string[]
 }
 
 export interface CanvasGraph {

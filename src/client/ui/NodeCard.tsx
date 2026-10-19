@@ -105,6 +105,15 @@ export const NodeCard: FC<NodeCardProps> = ({
       {node.seeded && (
         <span data-node-seeded="true" title="分叉会话" style={{ color: theme.accent, flex: '0 0 auto' }}>⑂</span>
       )}
+      {node.teamTasks !== undefined && node.teamTasks.length > 0 && (
+        <div
+          data-node-team-task
+          title={node.teamTasks.join(' | ')}
+          style={{ color: theme.warn, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 10 }}
+        >
+          ⚡ {node.teamTasks[0]}{node.teamTasks.length > 1 ? ` +${node.teamTasks.length - 1}` : ''}
+        </div>
+      )}
       {node.teamRole !== undefined && (
         <span
           data-node-team={node.teamRole}

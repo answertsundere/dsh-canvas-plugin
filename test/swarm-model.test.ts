@@ -469,3 +469,27 @@ describe('orderTeamTasks', () => {
     expect(orderTeamTasks(tasks).map(t => t.subject)).toEqual(['active', 'pending-1', 'pending-2', 'done-1', 'done-2'])
   })
 })
+
+import { teamTasksByOwner } from '../src/client/swarm/swarm-model.ts'
+
+describe('teamTasksByOwner', () => {
+  it('folds in-progress subjects per owner session', () => {
+    const byOwner = teamTasksByOwner({
+      projectionsBySession: {
+        lead: { values: { agentTeam: { members: [], tasks: [
+          { id: 't1', subject: '写接口', status: 'in_progress', ownerId: 'mate1' },
+          { id: 't2', subject: '已完成', status: 'completed', ownerId: 'mate1' },
+          { id: 't3', subject: '待办', status: 'pending', ownerId: 'mate2' },
+        ] } } },
+      },
+    })
+    expect(byOwner.get('mate1')).toEqual(['写接口'])
+    // Pending tasks are not in progress — they do not fold.
+    expect(byOwner.get('mate2')).toBeUndefined()
+  })
+
+  it('malformed projections yield an empty map', () => {
+    expect(teamTasksByOwner(null).size).toBe(0)
+    expect(teamTasksByOwner({ projectionsBySession: { a: { values: { agentTeam: { tasks: 'nope' } } } } }).size).toBe(0)
+  })
+})

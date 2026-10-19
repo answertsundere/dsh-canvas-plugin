@@ -478,3 +478,30 @@ describe('team member identity on the canvas', () => {
     expect(controller.model().graph.nodes.get('lead1')?.teamRole).toBe('lead')
   })
 })
+
+describe('team tasks on node cards', () => {
+  it('an in-progress shared task shows on the owning member card', () => {
+    const fake = makeDeps({
+      ids: ['lead1', 'mate1'],
+      byId: {
+        lead1: row('lead1', { cwd: 'C:/w', title: '主会话' }),
+        mate1: row('mate1', { parentId: 'lead1', cwd: 'C:/w', title: '你是校验员。工作…' }),
+      },
+    })
+    const base = fake.deps.listSnapshot()
+    fake.deps.listSnapshot = () => ({
+      ...(base as Record<string, unknown>),
+      projectionsBySession: {
+        lead1: { values: { agentTeam: { members: [
+          { id: 'mate1', name: '校验员', role: 'teammate' },
+        ], tasks: [
+          { id: 't1', subject: '校验链接', status: 'in_progress', ownerId: 'mate1' },
+          { id: 't2', subject: '待办任务', status: 'pending', ownerId: 'mate1' },
+        ] } } },
+      },
+    })
+    const controller = createGraphController(fake.deps)
+    const node = controller.model().graph.nodes.get('mate1')
+    expect(node?.teamTasks).toEqual(['校验链接'])
+  })
+})
