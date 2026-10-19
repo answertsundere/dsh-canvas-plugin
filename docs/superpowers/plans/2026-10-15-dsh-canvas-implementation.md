@@ -1042,6 +1042,12 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34d: round 30 — active members float, idle members dim (2026-10-17)
+
+The swarm orders member robots by life — streaming, then running, then failed, then idle — and idle chips render at 0.62 opacity. Active work is always the first thing the eye finds. **351 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34c: rounds 27–29 — board order, chip copy, hover spokes (2026-10-17)
 
 - **Round 27**: the team task board orders itself — in-progress on top, then pending, then finished (`orderTeamTasks`, pure, stable within bands).
