@@ -1,3 +1,4 @@
+import { useReducer } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { apply, inject } from '../src/client/index.ts'
@@ -715,18 +716,35 @@ describe('subtree collapse', () => {
     ], ['a']),
   })
 
-  it('the +/- toggle appears on nodes with children and collapses the subtree', () => {
-    const { container } = render(<CanvasTab canvas={model(threeNodes())} />)
+  it('the +/- toggle appears on nodes with children and collapses the subtree', async () => {
+    const collapsedNodes = new Set<string>()
+    const base = model(threeNodes())
+    // A stateful harness: toggling mutates the external set and forces a
+    // re-render, as the real controller's notify() does in the app.
+    function Harness(): JSX.Element {
+      const [, force] = useReducer((n: number) => n + 1, 0)
+      const canvasModel: CanvasModel = {
+        ...base,
+        get collapsedNodes() { return collapsedNodes },
+        toggleSubtree: (id: string) => {
+          if (collapsedNodes.has(id)) collapsedNodes.delete(id)
+          else collapsedNodes.add(id)
+          force()
+        },
+      }
+      return <CanvasTab canvas={canvasModel} />
+    }
+    const { container } = render(<Harness />)
     const toggle = container.querySelector('[data-node-collapse="b"]') as HTMLElement
     expect(toggle).not.toBeNull()
     expect(toggle.textContent).toBe('−')
     fireEvent.click(toggle)
-    // c is a descendant of b — hidden. a and b stay.
-    expect(container.querySelectorAll('[data-canvas-node]')).toHaveLength(2)
+    await waitFor(() => { expect(container.querySelectorAll('[data-canvas-node]')).toHaveLength(2) })
     expect(container.querySelector('[data-canvas-node="c"]')).toBeNull()
     // Toggle back expands.
     fireEvent.click(container.querySelector('[data-node-collapse="b"]') as Element)
-    expect(container.querySelectorAll('[data-canvas-node]')).toHaveLength(3)
+    await waitFor(() => { expect(container.querySelectorAll('[data-canvas-node]')).toHaveLength(3) })
+    void collapsedNodes
   })
 
   it('a node without children shows no toggle', () => {

@@ -67,6 +67,10 @@ export interface GraphController {
   /** Null until exactly two branches are selected, or when their events cannot be read. */
   compare(): Promise<ComparisonResult | null>
   subscribe(listener: () => void): () => void
+  /** Subtree roots currently collapsed (their descendants are hidden). */
+  readonly collapsedNodes: ReadonlySet<SessionId>
+  /** Toggles a subtree between collapsed and expanded. */
+  toggleSubtree(id: SessionId): void
   /** Releases every open live window. Plugin unload must leave no retains. */
   dispose(): void
 }
@@ -79,6 +83,9 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
   let statuses = new Map<SessionId, StatusBadge>()
   let selectedId: SessionId | undefined
   let compareIds: SessionId[] = []
+  // Subtrees collapsed via the card's +/- toggle. Survives tab switches —
+  // the controller is cached per conversation.
+  const collapsedNodes = new Set<SessionId>()
   let view: CanvasView = IDENTITY_VIEW
   const listeners = new Set<() => void>()
 
@@ -355,6 +362,12 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
     onToggleCompare: toggleCompare,
     onViewChange: next => { view = next; notify() },
     search,
+    get collapsedNodes() { return collapsedNodes },
+    toggleSubtree: (id: SessionId) => {
+      if (collapsedNodes.has(id)) collapsedNodes.delete(id)
+      else collapsedNodes.add(id)
+      notify()
+    },
     searchNext,
     refresh,
     subscribe: listener => {
@@ -424,6 +437,12 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
   refresh()
   return {
     model, refresh, select, toggleCompare, search, searchNext, openInChat, forkFromRow, compare,
+    get collapsedNodes() { return collapsedNodes },
+    toggleSubtree: (id: SessionId) => {
+      if (collapsedNodes.has(id)) collapsedNodes.delete(id)
+      else collapsedNodes.add(id)
+      notify()
+    },
     subscribe: listener => {
       listeners.add(listener)
       return () => { listeners.delete(listener) }

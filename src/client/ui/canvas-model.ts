@@ -41,6 +41,10 @@ export interface CanvasModel {
   search(text: string): void
   /** Jumps to the match after the current selection (Enter-to-cycle). */
   searchNext?(text: string): void
+  /** Subtree roots currently collapsed (their descendants are hidden). */
+  readonly collapsedNodes?: ReadonlySet<string>
+  /** Toggles a subtree between collapsed and expanded. */
+  toggleSubtree?(id: string): void
   /** Optional: the toolbar only shows 刷新 when the controller supplies one. */
   refresh?(): void
   /**

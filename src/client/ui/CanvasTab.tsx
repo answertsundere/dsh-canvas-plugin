@@ -452,12 +452,9 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   const dragStart = useRef<{ x: number; y: number } | null>(null)
   // Hovering a node highlights its spokes.
   const [hoverId, setHoverId] = useState<SessionId | undefined>(undefined)
-  // Subtrees collapsed via the node's +/- toggle.
-  const [collapsedNodes, setCollapsedNodes] = useState<ReadonlySet<string>>(() => new Set())
-
   // Collapsed subtrees drop out of the layout: their nodes, edges, and the
   // minimap all re-derive from the filtered graph.
-  const hidden = hiddenByCollapse(canvas.graph.nodes, collapsedNodes)
+  const hidden = hiddenByCollapse(canvas.graph.nodes, canvas.collapsedNodes ?? new Set())
   const displayGraph = hidden.size === 0
     ? canvas.graph
     : {
@@ -750,15 +747,8 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   onMouseLeave={() => setHoverId(undefined)}
                   collapseToggle={{
                     visible: node.childCount > 0,
-                    collapsed: collapsedNodes.has(node.id),
-                    onToggle: () => {
-                      setCollapsedNodes(current => {
-                        const next = new Set(current)
-                        if (next.has(node.id)) next.delete(node.id)
-                        else next.add(node.id)
-                        return next
-                      })
-                    },
+                    collapsed: (canvas.collapsedNodes ?? new Set()).has(node.id),
+                    onToggle: () => canvas.toggleSubtree?.(node.id),
                   }}
                 />
               )
