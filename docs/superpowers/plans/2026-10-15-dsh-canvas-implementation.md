@@ -1042,6 +1042,12 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34h: round 42 — keyboard pan and zoom (2026-10-17)
+
+Arrow keys pan the main canvas, +/- zoom — active only when the focus is not in a text field, so typing in search never moves the view. **368 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34g: rounds 39–41 — centered selection, timeline autoscroll (2026-10-17)
 
 - **Round 39**: selecting a node **centers it — but only when it sits outside the viewport**; nearby clicks never yank the view. The minimap's node dots select AND center in one press.
