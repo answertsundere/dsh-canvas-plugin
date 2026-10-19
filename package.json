@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Conversation branch canvas for DeepSeek Harness: lineage map, message-level fork, parallel run status, deterministic branch comparison.",
   "license": "MIT",
+  "packageManager": "pnpm@11.17.0",
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/host/index.d.ts",
