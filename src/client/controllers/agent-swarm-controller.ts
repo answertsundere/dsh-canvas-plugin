@@ -44,6 +44,8 @@ export interface AgentSwarmDeps {
   listSummaries(): readonly { id: string; title?: string; running: boolean }[]
   /** The session's agent team (members + shared tasks), from the projection. */
   teamOf?(sessionId: string): TeamLike | null
+  /** Archived sessions are user-put-away; they never join the web. */
+  isArchived?(sessionId: string): boolean
 }
 
 /** One agent chip on the web. */
@@ -200,10 +202,17 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
     edges = swarmEdges(nodes, rootId)
     // New agents get a window; a vanished window (cannot happen for append-only
     // catalogs, but stay safe) loses its own. Team teammates are sessions too —
-    // opening their windows is what makes the team live on the web.
-    for (const node of nodes) openWindow(node.id)
+    // opening their windows is what makes the team live on the web. Archived
+    // teammates are user-put-away: they join the web as static chips without
+    // windows, so the member loop (not this one) must handle them.
+    const memberIds = new Set((team?.members ?? []).map(member => member.id))
+    for (const node of nodes) {
+      if (!memberIds.has(node.id)) openWindow(node.id)
+    }
     for (const member of team?.members ?? []) {
-      if (member.id !== rootId) openWindow(member.id)
+      if (member.id === rootId) continue
+      if (deps.isArchived?.(member.id) ?? false) continue
+      openWindow(member.id)
     }
     for (const id of [...windows.keys()]) {
       if (id !== rootId && !nodes.some(node => node.id === id)) closeWindow(id)
@@ -261,11 +270,12 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
     for (const member of team?.members ?? []) {
       if (member.id === rootId || seen.has(member.id)) continue
       seen.add(member.id)
+      const archived = deps.isArchived?.(member.id) ?? false
       agents.push({
         id: member.id,
         label: member.name,
         depth: 1,
-        status: member.phase === 'failed' ? 'failed' : member.phase === 'running' ? 'running' : 'idle',
+        status: archived ? 'idle' : member.phase === 'failed' ? 'failed' : member.phase === 'running' ? 'running' : 'idle',
         snippet: null,
         tail: null,
         role: member.role,

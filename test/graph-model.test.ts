@@ -78,3 +78,23 @@ describe('buildLineageGraph', () => {
     expect(g.nodes.get('a')?.createdAt).toBe(9)
   })
 })
+import { hiddenByCollapse } from '../src/client/graph/graph-model.ts'
+
+describe('hiddenByCollapse', () => {
+  it('a collapsed node hides its entire descendant set but not itself', () => {
+    const nodes = new Map([
+      ['a', { id: 'a', parentId: null, externalParent: false, title: 'a', createdAt: 0, running: false, available: true, seeded: false, cwd: null, childCount: 1, depth: 0 }],
+      ['b', { id: 'b', parentId: 'a', externalParent: false, title: 'b', createdAt: 0, running: false, available: true, seeded: false, cwd: null, childCount: 1, depth: 1 }],
+      ['c', { id: 'c', parentId: 'b', externalParent: false, title: 'c', createdAt: 0, running: false, available: true, seeded: false, cwd: null, childCount: 0, depth: 2 }],
+    ])
+    expect([...hiddenByCollapse(nodes, new Set(['b']))]).toEqual(['c'])
+  })
+
+  it('collapsing a root hides everything below it', () => {
+    const nodes = new Map([
+      ['a', { id: 'a', parentId: null, externalParent: false, title: 'a', createdAt: 0, running: false, available: true, seeded: false, cwd: null, childCount: 1, depth: 0 }],
+      ['b', { id: 'b', parentId: 'a', externalParent: false, title: 'b', createdAt: 0, running: false, available: true, seeded: false, cwd: null, childCount: 0, depth: 1 }],
+    ])
+    expect([...hiddenByCollapse(nodes, new Set(['a']))]).toEqual(['b'])
+  })
+})

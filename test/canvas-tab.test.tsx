@@ -705,3 +705,32 @@ describe('hover highlights spokes', () => {
     expect(edge.getAttribute('stroke')).toBe('#e6e9ef')
   })
 })
+
+describe('subtree collapse', () => {
+  const threeNodes = () => ({
+    graph: graph([
+      node('a'),
+      node('b', { parentId: 'a', depth: 1, childCount: 1 }),
+      node('c', { parentId: 'b', depth: 2 }),
+    ], ['a']),
+  })
+
+  it('the +/- toggle appears on nodes with children and collapses the subtree', () => {
+    const { container } = render(<CanvasTab canvas={model(threeNodes())} />)
+    const toggle = container.querySelector('[data-node-collapse="b"]') as HTMLElement
+    expect(toggle).not.toBeNull()
+    expect(toggle.textContent).toBe('−')
+    fireEvent.click(toggle)
+    // c is a descendant of b — hidden. a and b stay.
+    expect(container.querySelectorAll('[data-canvas-node]')).toHaveLength(2)
+    expect(container.querySelector('[data-canvas-node="c"]')).toBeNull()
+    // Toggle back expands.
+    fireEvent.click(container.querySelector('[data-node-collapse="b"]') as Element)
+    expect(container.querySelectorAll('[data-canvas-node]')).toHaveLength(3)
+  })
+
+  it('a node without children shows no toggle', () => {
+    const { container } = render(<CanvasTab canvas={model()} />)
+    expect(container.querySelector('[data-node-collapse="a"]')).toBeNull()
+  })
+})

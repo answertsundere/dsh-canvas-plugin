@@ -351,3 +351,28 @@ describe('member ordering', () => {
     controller.dispose()
   })
 })
+
+describe('archived teammates', () => {
+  it('an archived teammate joins the web without a window', async () => {
+    const fake = makeDeps({ windows: { root: [] } })
+    const deps: AgentSwarmDeps = {
+      ...fake.deps,
+      isArchived: id => id === 'arch',
+      teamOf: () => ({
+        members: [
+          { id: 'live1', name: '在岗', role: 'teammate', phase: 'running' },
+          { id: 'arch', name: '已归档', role: 'teammate', phase: 'inactive' },
+        ],
+        tasks: [],
+      }),
+    }
+    const controller = createAgentSwarmController(deps, 'root')
+    await flush()
+    const agents = controller.state().agents
+    expect(agents.map(a => a.id)).toContain('arch')
+    // The archived member has no live window.
+    expect(fake.handles.has('arch')).toBe(false)
+    expect(fake.handles.has('live1')).toBe(true)
+    controller.dispose()
+  })
+})

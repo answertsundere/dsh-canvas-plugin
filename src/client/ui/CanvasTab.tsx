@@ -5,6 +5,7 @@ import {
 import type { ComparisonResult, LaunchMode, SessionId } from '../../shared/contracts.ts'
 import { theme } from '../theme.ts'
 import { layoutLayered, type LayoutPoint } from '../graph/graph-layout.ts'
+import { hiddenByCollapse } from '../graph/graph-model.ts'
 import { parallelWriteIds } from '../graph/parallel-write.ts'
 import { tailSnippet } from '../live/live-tail.ts'
 import { NodeCard } from './NodeCard.tsx'
@@ -348,8 +349,6 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
     )
   }
 
-  const layout = layoutLayered(canvas.graph, { nodeWidth: NODE_WIDTH, nodeHeight: NODE_HEIGHT })
-  const parallelWrite = parallelWriteIds(canvas.graph)
   const now = Date.now()
   const needle = query.trim().toLowerCase()
   const selectedNode = selectedId === undefined ? undefined : canvas.graph.nodes.get(selectedId)
@@ -360,6 +359,22 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
   const dragStart = useRef<{ x: number; y: number } | null>(null)
   // Hovering a node highlights its spokes.
   const [hoverId, setHoverId] = useState<SessionId | undefined>(undefined)
+  // Subtrees collapsed via the node's +/- toggle.
+  const [collapsedNodes, setCollapsedNodes] = useState<ReadonlySet<string>>(() => new Set())
+
+  // Collapsed subtrees drop out of the layout: their nodes, edges, and the
+  // minimap all re-derive from the filtered graph.
+  const hidden = hiddenByCollapse(canvas.graph.nodes, collapsedNodes)
+  const displayGraph = hidden.size === 0
+    ? canvas.graph
+    : {
+        ...canvas.graph,
+        nodes: new Map([...canvas.graph.nodes].filter(([id]) => !hidden.has(id))),
+        roots: canvas.graph.roots.filter(id => !hidden.has(id)),
+      }
+  const layout = layoutLayered(displayGraph, { nodeWidth: NODE_WIDTH, nodeHeight: NODE_HEIGHT })
+  const parallelWrite = parallelWriteIds(displayGraph)
+  const displayCanvas: CanvasModel = { ...canvas, graph: displayGraph }
   const handleNodeClick = (event: ReactMouseEvent<HTMLDivElement>, id: SessionId): void => {
     if (suppressClick.current) return
     if (event.metaKey || event.ctrlKey) canvas.onToggleCompare(id)
@@ -572,7 +587,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   <path d="M 0 0 L 10 5 L 0 10 z" fill={theme.warn} />
                 </marker>
               </defs>
-              {edgePaths(canvas, layout.positions, hoverId).map(edge => (
+              {edgePaths(displayCanvas, layout.positions, hoverId).map(edge => (
                 <path
                   key={`${edge.from}->${edge.to}`}
                   d={edge.d}
@@ -585,7 +600,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
               ))}
             </svg>
 
-            {[...canvas.graph.nodes.values()].map(node => {
+            {[...displayGraph.nodes.values()].map(node => {
               const nodeTail = canvas.tailOf?.(node.id) ?? null
               const nodeStatus = canvas.statusOf(node.id)
               return (
@@ -610,6 +625,18 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   onContext={openContext}
                   onMouseEnter={() => setHoverId(node.id)}
                   onMouseLeave={() => setHoverId(undefined)}
+                  collapseToggle={{
+                    visible: node.childCount > 0,
+                    collapsed: collapsedNodes.has(node.id),
+                    onToggle: () => {
+                      setCollapsedNodes(current => {
+                        const next = new Set(current)
+                        if (next.has(node.id)) next.delete(node.id)
+                        else next.add(node.id)
+                        return next
+                      })
+                    },
+                  }}
                 />
               )
             })}

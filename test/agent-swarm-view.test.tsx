@@ -558,3 +558,14 @@ describe('idle dimming', () => {
     expect(active.style.opacity).toBe('1')
   })
 })
+
+describe('active-only toggle', () => {
+  it('hides idle members when on', () => {
+    const state = activityState()
+    const { container } = render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    expect(container.querySelectorAll('[data-swarm-agent]')).toHaveLength(3)
+    fireEvent.click(document.querySelector('[data-swarm-active-only]') as Element)
+    expect(container.querySelectorAll('[data-swarm-agent]')).toHaveLength(2)
+    expect(document.querySelector('[data-swarm-agent="b"]')).toBeNull()
+  })
+})

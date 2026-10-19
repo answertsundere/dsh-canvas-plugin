@@ -201,6 +201,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
 
   // The palette choice survives reloads; storage failures degrade to
   // session-only choice.
+  const [activeOnly, setActiveOnly] = useState(false)
   const [paletteId, setPaletteId] = useState(() => {
     try {
       return window.localStorage.getItem('dsh-canvas-palette') ?? 'aurora'
@@ -248,7 +249,8 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
 
   const positionOf = (id: string): { x: number; y: number } => swarm.layout.positions.get(id) ?? { x: 0, y: 0 }
   const toolPositionOf = (id: string): { x: number; y: number } => swarm.toolLayout.positions.get(id) ?? { x: 0, y: 0 }
-  const agents = swarm.agents
+  const allAgents = swarm.agents
+  const agents = activeOnly ? allAgents.filter(agent => agent.status !== 'idle') : allAgents
   const tools = swarm.activity.tools
   // Teammates currently owning an in-progress shared task glow — the board
   // and the web tell the same story.
@@ -297,7 +299,21 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
           {swarm.team != null ? ` · 团队 ${swarm.team.members.length} 人` : ''}
           {pendingTool !== null ? ` · 正在 ${pendingTool.name}` : ''}
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+        <button
+          type="button"
+          data-swarm-active-only
+          data-active={activeOnly ? 'true' : 'false'}
+          title="只显示非空闲的成员"
+          onClick={() => setActiveOnly(current => !current)}
+          style={{
+            marginLeft: 'auto', background: theme.card, color: activeOnly ? theme.accent : theme.muted,
+            border: `1px solid ${activeOnly ? theme.accent : theme.border}`, borderRadius: 6,
+            padding: '2px 8px', font: 'inherit', cursor: 'pointer',
+          }}
+        >
+          只看活跃
+        </button>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {SWARM_PALETTES.map(candidate => (
             <button
               key={candidate.id}

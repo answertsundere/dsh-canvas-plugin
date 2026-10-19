@@ -39,10 +39,16 @@ export interface NodeCardProps {
   onMouseEnter?(id: string): void
   /** Hover ends. */
   onMouseLeave?(id: string): void
+  /** Subtree collapse: visible when the node has children. */
+  collapseToggle?: {
+    readonly visible: boolean
+    readonly collapsed: boolean
+    onToggle(): void
+  }
 }
 
 export const NodeCard: FC<NodeCardProps> = ({
-  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, active = false, dimmed = false, now, onClick, onOpen, onInspect, onContext, onMouseEnter, onMouseLeave,
+  node, status, position, width, height, selected, comparing, parallelWrite, highlight, live = null, active = false, dimmed = false, now, onClick, onOpen, onInspect, onContext, onMouseEnter, onMouseLeave, collapseToggle,
 }) => (
   <div
     data-canvas-node={node.id}
@@ -116,6 +122,23 @@ export const NodeCard: FC<NodeCardProps> = ({
       {status.label} · {relativeTime(now, node.createdAt)} · {node.childCount} 分支
       {node.externalParent && <span title="父会话不在当前工作区"> · 外部父</span>}
     </div>
+    {collapseToggle !== undefined && collapseToggle.visible && (
+      <button
+        type="button"
+        data-node-collapse={node.id}
+        title={collapseToggle.collapsed ? '展开子树' : '收起子树'}
+        onClick={event => { event.stopPropagation(); collapseToggle.onToggle() }}
+        style={{
+          position: 'absolute', top: 5, right: 28,
+          width: 18, height: 18, lineHeight: '16px', textAlign: 'center',
+          background: theme.card, color: theme.muted,
+          border: `1px solid ${theme.border}`, borderRadius: 5,
+          font: '11px system-ui, sans-serif', cursor: 'pointer', padding: 0,
+        }}
+      >
+        {collapseToggle.collapsed ? '+' : '−'}
+      </button>
+    )}
     {onInspect !== undefined && (
       <button
         type="button"

@@ -113,3 +113,34 @@ export function buildLineageGraph(
 
   return { nodes, roots, maxDepth }
 }
+/**
+ * Nodes hidden because their subtree root is collapsed: each collapsed node
+ * hides its entire descendant set (BFS over children), but never itself.
+ */
+export function hiddenByCollapse(
+  nodes: ReadonlyMap<string, CanvasNode>,
+  collapsed: ReadonlySet<string>,
+): ReadonlySet<string> {
+  const children = new Map<string, string[]>()
+  for (const node of nodes.values()) {
+    if (node.parentId === null) continue
+    const bucket = children.get(node.parentId)
+    if (bucket === undefined) children.set(node.parentId, [node.id])
+    else bucket.push(node.id)
+  }
+  const hidden = new Set<string>()
+  const queue: string[] = []
+  for (const id of collapsed) {
+    if (nodes.has(id)) queue.push(id)
+  }
+  while (queue.length > 0) {
+    const current = queue.shift() as string
+    for (const child of children.get(current) ?? []) {
+      if (!hidden.has(child)) {
+        hidden.add(child)
+        queue.push(child)
+      }
+    }
+  }
+  return hidden
+}

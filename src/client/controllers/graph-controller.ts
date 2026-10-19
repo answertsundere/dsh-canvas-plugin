@@ -366,6 +366,7 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
       })),
       // The agent team rides the session list's projections: `agentTeam` is
       // the durable roster + task board of the Team rooted at that session.
+      isArchived: id => toArchivedIds(deps.workspaceSnapshot()).has(id),
       teamOf: sessionId => {
         const snapshot = deps.listSnapshot()
         if (snapshot === null || typeof snapshot !== 'object') return null
