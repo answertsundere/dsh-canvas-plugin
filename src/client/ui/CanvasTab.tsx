@@ -1,5 +1,5 @@
 import {
-  useEffect, useReducer, useRef, useState,
+  Fragment, useEffect, useReducer, useRef, useState,
   type CSSProperties, type FC, type MouseEvent as ReactMouseEvent,
 } from 'react'
 import type { ComparisonResult, LaunchMode, SessionId } from '../../shared/contracts.ts'
@@ -84,6 +84,9 @@ const CANVAS_CSS = `
 [data-canvas-node]:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4); }
 /* Threads feeding working sessions flow, like the swarm's silk. */
 .dsh-edge-busy { stroke-dasharray: 6 6; animation: dshDashFlow 0.9s linear infinite; }
+/* The selected card breathes a soft accent ring. */
+@keyframes dshSelectedBreath { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 3px #6af55; } }
+[data-canvas-node][data-selected='true'] { animation: dshSelectedBreath 2.2s ease-in-out infinite; }
 @keyframes dshWaitBreath { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 [data-conclusion-waiting] { animation: dshWaitBreath 1.6s ease-in-out infinite; }
 .dsh-robot-v-search.dsh-robot-idle [data-robot-part='magnifier'] { transform-origin: 24px 20px; animation: dshIdleSwing 3.6s ease-in-out infinite; }
@@ -680,6 +683,9 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
               style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}
             >
               <defs>
+                <filter id="dsh-glow" x="-40%" y="-40%" width="180%" height="180%">
+                  <feGaussianBlur stdDeviation="3.5" />
+                </filter>
                 <marker id="dsh-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
                   <path d="M 0 0 L 10 5 L 0 10 z" fill={theme.border} />
                 </marker>
@@ -691,16 +697,28 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                 </marker>
               </defs>
               {edgePaths(displayCanvas, layout.positions, hoverId).map(edge => (
-                <path
-                  key={`${edge.from}->${edge.to}`}
-                  d={edge.d}
-                  fill="none"
-                  stroke={edge.active ? theme.accent : edge.hover ? theme.text : edge.busy ? theme.warn : theme.border}
-                  strokeWidth={edge.active ? 1.8 : edge.hover ? 2 : edge.busy ? 1.6 : 1.5}
-                  opacity={edge.active ? 1 : edge.busy ? 0.8 : 0.7}
-                  className={edge.busy ? 'dsh-edge-busy' : undefined}
-                  markerEnd={edge.active ? 'url(#dsh-arrow-accent)' : edge.busy ? 'url(#dsh-arrow-warn)' : 'url(#dsh-arrow)'}
-                />
+                <Fragment key={`${edge.from}->${edge.to}`}>
+                  <path
+                    d={edge.d}
+                    fill="none"
+                    stroke={edge.active ? theme.accent : edge.hover ? theme.text : edge.busy ? theme.warn : theme.border}
+                    strokeWidth={edge.active ? 1.8 : edge.hover ? 2 : edge.busy ? 1.6 : 1.5}
+                    opacity={edge.active ? 1 : edge.busy ? 0.8 : 0.7}
+                    className={edge.busy ? 'dsh-edge-busy' : undefined}
+                    markerEnd={edge.active ? 'url(#dsh-arrow-accent)' : edge.busy ? 'url(#dsh-arrow-warn)' : 'url(#dsh-arrow)'}
+                  />
+                  {edge.busy && (
+                    <path
+                      data-edge-glow={`${edge.from}->${edge.to}`}
+                      d={edge.d}
+                      fill="none"
+                      stroke={theme.warn}
+                      strokeWidth={4}
+                      opacity={0.35}
+                      filter="url(#dsh-glow)"
+                    />
+                  )}
+                </Fragment>
               ))}
             </svg>
 

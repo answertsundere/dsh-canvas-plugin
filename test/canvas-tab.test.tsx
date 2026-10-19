@@ -808,3 +808,18 @@ describe('visual texture and status badge', () => {
     expect(container.querySelector('.dsh-edge-busy')).not.toBeNull()
   })
 })
+
+describe('glow layer', () => {
+  it('busy edges carry a blurred glow duplicate', () => {
+    const { container } = render(<CanvasTab canvas={model({
+      statusOf: id => badge(id === 'b' ? 'thinking' : 'idle'),
+    })} />)
+    expect(container.querySelector('[data-edge-glow]')).not.toBeNull()
+    expect(container.querySelector('#dsh-glow')).not.toBeNull()
+  })
+
+  it('idle edges have no glow duplicate', () => {
+    const { container } = render(<CanvasTab canvas={model()} />)
+    expect(container.querySelector('[data-edge-glow]')).toBeNull()
+  })
+})
