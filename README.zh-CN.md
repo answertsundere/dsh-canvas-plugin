@@ -38,7 +38,15 @@ DSH 原生支持会话分叉，侧边栏也能看到会话列表，但：
 
 ## 安装
 
-插件目前以源码形式分发——npm 上的名字已被预留但尚未发布（见[发布阻塞](#️-发布前的已知阻塞)）。
+一行命令，从 GitHub 直装（锁定发布 tag，无需构建）：
+
+```sh
+dsh plugin --profile <你的 profile> add "github:answertsundere/dsh-canvas-plugin#v0.1.0"
+```
+
+装完重启 App / profile——新增的 bundle 行只在 host 启动时读取。
+
+从源码装（开发用）：
 
 ```bash
 git clone https://github.com/answertsundere/dsh-canvas-plugin

@@ -38,7 +38,15 @@ DSH supports forking natively and the sidebar lists sessions, but:
 
 ## Install
 
-The plugin is distributed from source for now — the npm name is reserved but not yet published (see the [publish blocker](#️-known-publish-blocker)).
+One line, straight from GitHub (pinned release tag, no build needed):
+
+```sh
+dsh plugin --profile <your-profile> add "github:answertsundere/dsh-canvas-plugin#v0.1.0"
+```
+
+Restart the app / profile afterwards — a newly added bundle row is read at host boot.
+
+From source (for development):
 
 ```bash
 git clone https://github.com/answertsundere/dsh-canvas-plugin

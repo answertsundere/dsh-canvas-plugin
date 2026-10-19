@@ -4,6 +4,10 @@ All notable changes to this project. Format follows [Keep a Changelog](https://k
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-19
+
+First public release. Source on `main`; the `v0.1.0` tag / `release/v0.1.0` branch additionally carries the built `lib/`, so GitHub-spec installs work: `dsh plugin add "github:answertsundere/dsh-canvas-plugin#v0.1.0"`.
+
 ### Added
 
 - Lineage canvas: workspace sessions laid out by `parentSession`, layered left→right, with zoom, pan, fit-to-view, and search-to-locate.
