@@ -24,6 +24,8 @@ export interface AgentNode {
   readonly depth: number
   readonly label?: string
   readonly mode: 'one-shot' | 'continuable' | 'unknown'
+  /** The lead's job description for this member (from team/member events). */
+  readonly description?: string
 }
 
 export interface SwarmEdge {
@@ -95,6 +97,24 @@ export function agentsFromWindows(
           mode: child.mode,
         })
         changed = true
+      }
+      // Fold teammate descriptions from team/member events (the lead's own
+      // job description for each member, often written in the user's language).
+      for (const entry of window.entries) {
+        const row = asRecord(entry)
+        if (row === null || row['type'] !== 'event') continue
+        const event = asRecord(row['event'])
+        if (event === null || event['type'] !== 'team/member') continue
+        const data = asRecord(event['data'])
+        const member = asRecord(data?.['member'])
+        if (member === null) continue
+        const memberId = asString(member['id'])
+        const description = asString(member['description'])
+        if (memberId === null || description === null || description === '') continue
+        const known = agents.get(memberId)
+        if (known !== undefined && known.description === undefined) {
+          agents.set(memberId, { ...known, description })
+        }
       }
     }
   }

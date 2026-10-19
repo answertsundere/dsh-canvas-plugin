@@ -64,6 +64,8 @@ export interface AgentSwarmAgent {
   readonly toolCount: number
   /** The member's own latest conclusion, when one exists. */
   readonly conclusion: string | null
+  /** The lead's job description for this member. */
+  readonly description?: string
 }
 
 export interface AgentSwarmState {
@@ -278,6 +280,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
         tail,
         toolCount: toolCounts.get(id) ?? 0,
         conclusion: conclusions.get(id) ?? null,
+        description: nodeById.get(id)?.description,
         ...(member === undefined ? {} : { role: member.role }),
       })
     }
@@ -296,6 +299,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
         tail: null,
         toolCount: 0,
         conclusion: null,
+        description: nodeById.get(member.id)?.description,
         role: member.role,
       })
     }
