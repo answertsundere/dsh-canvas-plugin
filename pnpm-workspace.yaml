@@ -1,0 +1,14 @@
+# pnpm 11 blocks dependency lifecycle scripts unless reviewed here
+# (strictDepBuilds defaults to true: an unlisted script is a hard install
+# error). Reviewed the same way as the harness repo upstream: allow only what
+# the verify loop needs and deny the rest — a denied script is skipped at
+# install, not a failure. esbuild is tsdown's bundler backend and is the only
+# one CI actually executes; the denied packages belong to the DSH host runtime
+# that typecheck/test/build never load.
+allowBuilds:
+  esbuild: true
+  '@deepseek-ai/dsh-subprocess-local': false
+  '@google/genai': false
+  koffi: false
+  node-pty: false
+  protobufjs: false
