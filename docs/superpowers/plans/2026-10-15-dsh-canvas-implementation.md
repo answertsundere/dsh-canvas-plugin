@@ -1042,6 +1042,15 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34g: rounds 39–41 — centered selection, timeline autoscroll (2026-10-17)
+
+- **Round 39**: selecting a node **centers it — but only when it sits outside the viewport**; nearby clicks never yank the view. The minimap's node dots select AND center in one press.
+- **Round 40**: the detail timeline **auto-scrolls to keep the newest turn in view** as turns stream in.
+
+**Numbers:** 18 files / **366 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34f: round 38 — agent chips show their tool count (2026-10-17)
 
 A teammate's chip reads 团队成员 · N 工具 — who is carrying the most work is readable without opening anything. The controller folds each member window through `activityFromEntries` for the count. **365 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
