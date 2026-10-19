@@ -1042,6 +1042,16 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34e: rounds 35–37 — match count, accurate frame, keyboard chips (2026-10-17)
+
+- **Round 35**: the toolbar shows how many nodes match the search query (`N 个匹配`).
+- **Round 36**: the minimap's viewport frame tracks the **measured stage** (ResizeObserver on the canvas surface) instead of the nominal viewport — the frame now reflects the real window on any screen size.
+- **Round 37**: swarm chips are **keyboard-accessible** (`role="button"`, tabbable, Enter/Space navigate); the swarm view no longer owns its own Escape listener — the canvas layers Escape (menu → swarm → selection).
+
+**Numbers:** 18 files / **364 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34d: rounds 31–33 — collapse, active-only, archived members (2026-10-17)
 
 - **Round 31 (subtree collapse)**: nodes with children carry a −/+ toggle; collapsing hides the entire descendant subtree (`hiddenByCollapse`, BFS) and the layout, edges, and minimap re-derive from the filtered graph.
