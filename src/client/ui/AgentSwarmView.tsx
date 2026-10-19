@@ -561,6 +561,7 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
                 style={{
                   ...chipStyle(agent.status === 'streaming', accent),
                   cursor: onSelectAgent === undefined ? 'default' : 'pointer',
+                  opacity: agent.status === 'idle' ? 0.62 : 1,
                   left: VIEW.width / 2 + p.x,
                   top: VIEW.height / 2 + p.y,
                   outline: `1px dashed ${statusColor(agent.status, accent)}`,

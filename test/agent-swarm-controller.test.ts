@@ -326,3 +326,28 @@ describe('root conclusion in the swarm', () => {
     controller.dispose()
   })
 })
+
+describe('member ordering', () => {
+  it('active members float above idle ones', async () => {
+    const fake = makeDeps({
+      windows: { root: [] },
+      summaries: [{ id: 'root', title: '主会话', running: false }],
+    })
+    const deps: AgentSwarmDeps = {
+      ...fake.deps,
+      teamOf: () => ({
+        members: [
+          { id: 'root', name: 'lead', role: 'lead', phase: 'active' },
+          { id: 'idle1', name: '闲着的', role: 'teammate', phase: 'inactive' },
+          { id: 'busy1', name: '忙着的', role: 'teammate', phase: 'running' },
+        ],
+        tasks: [],
+      }),
+    }
+    const controller = createAgentSwarmController(deps, 'root')
+    await flush()
+    const agents = controller.state().agents
+    expect(agents.map(a => a.status)).toEqual(['running', 'idle'])
+    controller.dispose()
+  })
+})

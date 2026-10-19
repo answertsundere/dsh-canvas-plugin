@@ -235,6 +235,7 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
           ?? `agent ${shortId(id)}`
 
     const seen = new Set<string>()
+    const statusRank: Record<AgentSwarmAgent['status'], number> = { streaming: 0, running: 1, failed: 2, idle: 3 }
     const agents: AgentSwarmAgent[] = []
     for (const id of [...windows.keys(), ...failed]) {
       if (id === rootId || seen.has(id)) continue
@@ -270,6 +271,8 @@ export function createAgentSwarmController(deps: AgentSwarmDeps, rootId: string)
         role: member.role,
       })
     }
+    // Active work floats to the top; idle members sink.
+    agents.sort((a, b) => statusRank[a.status] - statusRank[b.status])
     return {
       rootId,
       rootLabel: labelOf(rootId),

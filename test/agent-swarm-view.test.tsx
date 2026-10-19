@@ -547,3 +547,14 @@ describe('tool chip copy', () => {
     await waitFor(() => { expect(writeText).toHaveBeenCalledWith('pwsh npm test') })
   })
 })
+
+describe('idle dimming', () => {
+  it('idle member chips are dimmed', () => {
+    const state = activityState()
+    render(<AgentSwarmView swarm={state} onClose={() => {}} nowMs={NOW} />)
+    const idle = document.querySelector('[data-swarm-agent="b"]') as HTMLElement
+    expect(idle.style.opacity).toBe('0.62')
+    const active = document.querySelector('[data-swarm-agent="a"]') as HTMLElement
+    expect(active.style.opacity).toBe('1')
+  })
+})
