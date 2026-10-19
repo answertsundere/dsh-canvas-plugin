@@ -112,21 +112,22 @@ export function swarmEdges(agents: readonly AgentNode[], rootId: string): SwarmE
 /**
  * Radial web layout: the root at the origin, depth-1 agents evenly spaced on
  * the main ring, deeper agents orbiting their own parent on a smaller ring.
+ * The ring radius adapts to the member count so station cards never overlap.
  * Deterministic — the same agent set always draws the same web.
  */
 export function layoutSwarm(
   agents: readonly AgentNode[],
   rootId: string,
-  opts: { radius?: number; childRadius?: number } = {},
+  opts: { radius?: number; childRadius?: number; cardWidth?: number } = {},
 ): SwarmLayout {
-  const radius = opts.radius ?? 230
+  const cardWidth = opts.cardWidth ?? 230
+  const minRing = opts.radius ?? 230
   const childRadius = opts.childRadius ?? 95
   const positions = new Map<string, { x: number; y: number }>()
   positions.set(rootId, { x: 0, y: 0 })
 
   const byParent = new Map<string, AgentNode[]>()
   for (const agent of agents) {
-    // The root sits at the center; it is never binned onto a ring.
     if (agent.id === rootId) continue
     const key = agent.parentId ?? '__orphan__'
     const bucket = byParent.get(key)
@@ -134,10 +135,14 @@ export function layoutSwarm(
     else bucket.push(agent)
   }
 
+  // The ring must be wide enough that station cards (cardWidth each) don't
+  // overlap: circumference >= count * cardWidth.
+  const ringRadiusFor = (count: number, min: number): number =>
+    count <= 1 ? min : Math.max(min, Math.ceil((count * cardWidth) / (2 * Math.PI)))
+
   const ring = (center: { x: number; y: number }, ringRadius: number, nodes: readonly AgentNode[]): void => {
     const count = nodes.length
     nodes.forEach((node, index) => {
-      // Start at the top and walk clockwise; one agent sits straight up.
       const angle = -Math.PI / 2 + (2 * Math.PI * index) / count
       positions.set(node.id, {
         x: center.x + ringRadius * Math.cos(angle),
@@ -146,9 +151,9 @@ export function layoutSwarm(
     })
   }
 
-  ring({ x: 0, y: 0 }, radius, byParent.get(rootId) ?? [])
-  // Orphans (parent outside the readable windows) still get a place on an
-  // outer ring, so nothing visible is missing a coordinate.
+  const rootRing = byParent.get(rootId) ?? []
+  const radius = ringRadiusFor(rootRing.length, minRing)
+  ring({ x: 0, y: 0 }, radius, rootRing)
   ring({ x: 0, y: 0 }, radius + 60, byParent.get('__orphan__') ?? [])
   for (const [parentId, nodes] of byParent) {
     if (parentId === rootId || parentId === '__orphan__') continue
@@ -157,8 +162,6 @@ export function layoutSwarm(
     ring(center, childRadius, nodes)
   }
 
-  // Anything whose parent never got placed (deep chains beyond MAX_DEPTH are
-  // excluded upstream, so this is defensive) lands on the outer ring.
   for (const agent of agents) {
     if (!positions.has(agent.id)) {
       positions.set(agent.id, { x: radius + 120, y: 0 })
