@@ -9,6 +9,8 @@ A conversation-branch canvas for DeepSeek Harness: draw the current workspace's 
 |---|---|
 | ![Lineage canvas](.github/assets/canvas-overview.png) | ![Agent war room](.github/assets/swarm-warroom.png) |
 
+**Try it without installing**: the [online demo](https://answertsundere.github.io/dsh-canvas-plugin/) runs the real UI against synthetic data. Locally: `pnpm run demo`, then open `demo/index.html`.
+
 > Target: DSH `0.2.0-rc.2`. Every DSH API used here was verified against the local checkout (commit `639ed01539`), not against online docs.
 
 ## What it solves

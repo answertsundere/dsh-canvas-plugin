@@ -28,6 +28,7 @@
   "scripts": {
     "build": "tsdown && tsc -p tsconfig.types.json",
     "bundle": "tsdown",
+    "demo": "tsdown --config tsdown.demo.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "install:local": "node scripts/install-local.mjs",
