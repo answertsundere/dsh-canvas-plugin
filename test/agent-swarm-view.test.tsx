@@ -569,3 +569,13 @@ describe('active-only toggle', () => {
     expect(document.querySelector('[data-swarm-agent="b"]')).toBeNull()
   })
 })
+describe('chip keyboard access', () => {
+  it('Enter on a teammate robot navigates', () => {
+    const onSelectAgent = vi.fn()
+    render(<AgentSwarmView swarm={swarmState()} onClose={() => {}} onSelectAgent={onSelectAgent} nowMs={NOW} />)
+    const chip = document.querySelector('[data-swarm-agent="a"]') as HTMLElement
+    expect(chip.getAttribute('role')).toBe('button')
+    fireEvent.keyDown(chip, { key: 'Enter' })
+    expect(onSelectAgent).toHaveBeenCalledWith('a')
+  })
+})

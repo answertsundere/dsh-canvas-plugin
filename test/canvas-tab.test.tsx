@@ -734,3 +734,28 @@ describe('subtree collapse', () => {
     expect(container.querySelector('[data-node-collapse="a"]')).toBeNull()
   })
 })
+
+describe('search match count', () => {
+  it('the toolbar shows how many nodes match the query', () => {
+    const { container } = render(<CanvasTab canvas={model()} />)
+    const input = container.querySelector('[data-canvas-search]') as HTMLInputElement
+    fireEvent.change(input, { target: { value: 'branch' } })
+    expect(container.querySelector('[data-canvas-match-count]')?.textContent).toContain('1 个匹配')
+  })
+
+  it('no matches reads as zero', () => {
+    const { container } = render(<CanvasTab canvas={model()} />)
+    const input = container.querySelector('[data-canvas-search]') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '不存在' } })
+    expect(container.querySelector('[data-canvas-match-count]')?.textContent).toContain('0 个匹配')
+  })
+})
+
+describe('minimap frame', () => {
+  it('the viewport frame is present and sized', () => {
+    const { container } = render(<CanvasTab canvas={model()} />)
+    const frame = container.querySelector('[data-minimap-frame]') as HTMLElement
+    expect(frame).not.toBeNull()
+    expect(frame.style.width.endsWith('px')).toBe(true)
+  })
+})

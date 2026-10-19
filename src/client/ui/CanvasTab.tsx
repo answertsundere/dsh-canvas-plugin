@@ -87,9 +87,11 @@ const CANVAS_CSS = `
 const MiniMap: FC<{
   readonly canvas: CanvasModel
   readonly layout: { width: number; height: number; positions: ReadonlyMap<SessionId, LayoutPoint> }
+  /** The measured stage the web renders into; defaults to the nominal viewport. */
+  readonly stage?: { readonly width: number; readonly height: number }
   onViewChange(view: CanvasView): void
   onSelectNode?(id: SessionId): void
-}> = ({ canvas, layout, onViewChange, onSelectNode }) => {
+}> = ({ canvas, layout, stage, onViewChange, onSelectNode }) => {
   // Dragging anywhere on the minimap pans the real view in real time.
   const dragRef = useRef<{ x: number; y: number; viewX: number; viewY: number } | null>(null)
   const onDragMove = (event: ReactMouseEvent): void => {
@@ -106,8 +108,10 @@ const MiniMap: FC<{
     BOX.width / Math.max(layout.width, 1),
     BOX.height / Math.max(layout.height, 1),
   )
-  const viewportWidth = Math.max((FIT_VIEWPORT.width / canvas.view.scale) * scale, 10)
-  const viewportHeight = Math.max((FIT_VIEWPORT.height / canvas.view.scale) * scale, 10)
+  const stageWidth = stage?.width ?? FIT_VIEWPORT.width
+  const stageHeight = stage?.height ?? FIT_VIEWPORT.height
+  const viewportWidth = Math.max((stageWidth / canvas.view.scale) * scale, 10)
+  const viewportHeight = Math.max((stageHeight / canvas.view.scale) * scale, 10)
   const viewportX = BOX.pad - canvas.view.x * scale
   const viewportY = BOX.pad - canvas.view.y * scale
   return (
@@ -138,6 +142,7 @@ const MiniMap: FC<{
       }}
     >
       <div
+        data-minimap-frame
         style={{
           position: 'absolute', left: viewportX, top: viewportY,
           width: viewportWidth, height: viewportHeight,
@@ -297,6 +302,24 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
     }
   }, [fitView])
 
+  // The minimap's viewport frame is drawn against the measured stage, so it
+  // tracks the real window rather than the nominal one.
+  const surfaceRef = useRef<HTMLDivElement | null>(null)
+  const [stageSize, setStageSize] = useState<{ width: number; height: number } | undefined>(undefined)
+  useEffect(() => {
+    const element = surfaceRef.current
+    if (element === null || typeof ResizeObserver === 'undefined') return
+    const measure = (): void => {
+      setStageSize({ width: element.clientWidth, height: element.clientHeight })
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => { observer.disconnect() }
+  }, [])
+
+
+
   const [menu, setMenu] = useState<{ x: number; y: number; id: string } | null>(null)
   const openContext = (event: ReactMouseEvent<HTMLDivElement>, id: string): void => {
     setMenu({ x: event.clientX, y: event.clientY, id })
@@ -351,6 +374,8 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
 
   const now = Date.now()
   const needle = query.trim().toLowerCase()
+  const matches = (needle: string): number =>
+    needle === '' ? 0 : [...canvas.graph.nodes.values()].filter(node => matchesNode(node, needle)).length
   const selectedNode = selectedId === undefined ? undefined : canvas.graph.nodes.get(selectedId)
 
   // A pan that started on a card must not end as an accidental selection:
@@ -487,6 +512,11 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
           font: '12px system-ui, sans-serif',
         }}
       >
+        {needle !== '' && (
+          <span data-canvas-match-count style={{ color: theme.muted, font: '11px system-ui, sans-serif' }}>
+            {matches(needle)} 个匹配
+          </span>
+        )}
         <input
           data-canvas-search
           value={query}
@@ -513,6 +543,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
 
       <div style={{ display: 'flex', flex: '1 1 auto', minHeight: 0 }}>
         <div
+          ref={surfaceRef}
           data-canvas-surface
           onMouseDown={event => {
             drag.current = {
@@ -614,7 +645,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   selected={canvas.selectedId === node.id}
                   comparing={canvas.compareIds.includes(node.id)}
                   parallelWrite={parallelWrite.has(node.id)}
-                  highlight={needle !== '' && matches(node.title, node.id, needle)}
+                  highlight={needle !== '' && matchesNode(node, needle)}
                   live={nodeTail === null ? null : tailSnippet(nodeTail, 40)}
                   active={nodeStatus.kind === 'thinking' || nodeStatus.kind === 'tool' || nodeTail !== null}
                   dimmed={now - node.createdAt > 24 * 60 * 60 * 1000}
@@ -767,6 +798,10 @@ function edgePaths(canvas: CanvasModel, positions: ReadonlyMap<SessionId, Layout
 
 function matches(title: string, id: string, needle: string): boolean {
   return title.toLowerCase().includes(needle) || id.toLowerCase().includes(needle)
+}
+
+function matchesNode(node: { title: string; id: string }, needle: string): boolean {
+  return matches(node.title, node.id, needle)
 }
 
 function clamp(value: number, min: number, max: number): number {

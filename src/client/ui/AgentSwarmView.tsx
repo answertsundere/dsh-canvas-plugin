@@ -573,6 +573,11 @@ export const AgentSwarmView: FC<AgentSwarmViewProps> = ({ swarm, onClose, onSele
               <div
                 key={agent.id}
                 data-swarm-agent={agent.id}
+                role={onSelectAgent === undefined ? undefined : 'button'}
+                tabIndex={onSelectAgent === undefined ? undefined : 0}
+                onKeyDown={onSelectAgent === undefined ? undefined : event => {
+                  if (event.key === 'Enter' || event.key === ' ') onSelectAgent(agent.id)
+                }}
                 onClick={onSelectAgent === undefined ? undefined : () => onSelectAgent(agent.id)}
                 style={{
                   ...chipStyle(agent.status === 'streaming', accent),
