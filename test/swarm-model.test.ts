@@ -513,3 +513,17 @@ describe('toolLabel', () => {
     expect(toolLabel('mystery_tool')).toBe('mystery_tool')
   })
 })
+
+import { getTeamDescription } from '../src/client/swarm/swarm-model.ts'
+
+describe('team description cache', () => {
+  it('caches and retrieves descriptions from team/member events', () => {
+    agentsFromWindows([{
+      sessionId: 'root',
+      entries: [
+        { type: 'event', event: { type: 'team/member', seq: 1, data: { version: 2, teamId: 't1', member: { id: 'm1', name: '校验员', role: 'teammate', status: 'inactive', description: '负责检查链接校验' } } } },
+      ],
+    }], 'root')
+    expect(getTeamDescription('m1')).toBe('负责检查链接校验')
+  })
+})

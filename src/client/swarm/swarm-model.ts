@@ -46,6 +46,15 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const asString = (value: unknown): string | null =>
   typeof value === 'string' ? value : null
 
+/** Team member descriptions folded from `team/member` events. Shared between
+ *  the swarm controller (writes) and the graph-controller (reads). */
+const teamDescriptionCache = new Map<string, string>()
+
+/** Reads a cached team member description by session id. */
+export function getTeamDescription(id: string): string | undefined {
+  return teamDescriptionCache.get(id)
+}
+
 const catalogChildren = (entries: readonly unknown[]): { id: string; label?: string; mode: AgentNode['mode'] }[] => {
   const children: { id: string; label?: string; mode: AgentNode['mode'] }[] = []
   for (const entry of entries) {
@@ -111,6 +120,7 @@ export function agentsFromWindows(
         const memberId = asString(member['id'])
         const description = asString(member['description'])
         if (memberId === null || description === null || description === '') continue
+        teamDescriptionCache.set(memberId, description)
         const known = agents.get(memberId)
         if (known !== undefined && known.description === undefined) {
           agents.set(memberId, { ...known, description })
