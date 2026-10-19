@@ -302,6 +302,27 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
     }
   }, [fitView])
 
+  // Selecting a node centers it — but only when it is outside the viewport;
+  // nearby clicks must not yank the view.
+  const centerOn = (id: SessionId): void => {
+    if (canvas === undefined) return
+    const point = layout.positions.get(id)
+    if (point === undefined) return
+    const screenX = point.x * canvas.view.scale + canvas.view.x
+    const screenY = point.y * canvas.view.scale + canvas.view.y
+    if (screenX >= 0 && screenX <= FIT_VIEWPORT.width && screenY >= 0 && screenY <= FIT_VIEWPORT.height) return
+    canvas.onViewChange({
+      x: FIT_VIEWPORT.width / 2 - (point.x + NODE_WIDTH / 2) * canvas.view.scale,
+      y: FIT_VIEWPORT.height / 2 - (point.y + NODE_HEIGHT / 2) * canvas.view.scale,
+      scale: canvas.view.scale,
+    })
+  }
+
+  useEffect(() => {
+    if (selectedId !== undefined) centerOn(selectedId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedId])
+
   // The minimap's viewport frame is drawn against the measured stage, so it
   // tracks the real window rather than the nominal one.
   const surfaceRef = useRef<HTMLDivElement | null>(null)
@@ -677,8 +698,12 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
             <MiniMap
               canvas={canvas}
               layout={layout}
-              onViewChange={canvas.onViewChange}
-              onSelectNode={id => canvas.onSelect(id)}
+              stage={stageSize}
+              onViewChange={view => canvas.onViewChange(view)}
+              onSelectNode={id => {
+                canvas.onSelect(id)
+                centerOn(id)
+              }}
             />
           )}
         </div>

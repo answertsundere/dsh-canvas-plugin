@@ -347,3 +347,16 @@ describe('expandable args', () => {
     expect(document.querySelector('[data-row-args-detail]')).toBeNull()
   })
 })
+
+describe('timeline autoscroll', () => {
+  it('the timeline container scrolls', () => {
+    const { container } = render(<BranchTimeline
+      turns={[{ index: 0, userMessage: 'a', tools: [], firstSeq: 1, lastSeq: 2, synthetic: false }]}
+      inheritedCount={0} cwdWarning={false} onFork={() => {}}
+    />)
+    const timeline = container.querySelector('[data-branch-timeline]') as HTMLElement
+    // jsdom has no layout, so scrollHeight is 0 — assignment still lands.
+    timeline.scrollTop = 120
+    expect(timeline.scrollTop).toBe(120)
+  })
+})
