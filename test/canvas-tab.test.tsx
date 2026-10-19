@@ -781,3 +781,30 @@ describe('keyboard pan and zoom', () => {
     expect(onViewChange).not.toHaveBeenCalled()
   })
 })
+
+describe('visual texture and status badge', () => {
+  it('the surface carries the dot-grid texture', () => {
+    const { container } = render(<CanvasTab canvas={model()} />)
+    const surface = container.querySelector('[data-canvas-surface]') as HTMLElement
+    expect(surface.className).toContain('dsh-canvas-surface')
+  })
+
+  it('the toolbar counts running sessions', () => {
+    const { container } = render(<CanvasTab canvas={model({
+      statusOf: id => badge(id === 'b' ? 'thinking' : 'idle'),
+    })} />)
+    expect(container.querySelector('[data-canvas-running-count]')?.textContent).toContain('1 运行中')
+  })
+
+  it('node cards carry the hover-lift class', () => {
+    render(<CanvasTab canvas={model()} />)
+    expect((document.querySelector('[data-canvas-node="a"]') as HTMLElement).className).toContain('dsh-node-card')
+  })
+
+  it('busy threads flow (dsh-edge-busy class)', () => {
+    const { container } = render(<CanvasTab canvas={model({
+      statusOf: id => badge(id === 'b' ? 'thinking' : 'idle'),
+    })} />)
+    expect(container.querySelector('.dsh-edge-busy')).not.toBeNull()
+  })
+})

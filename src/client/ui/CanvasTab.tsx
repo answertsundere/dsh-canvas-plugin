@@ -73,6 +73,17 @@ const CANVAS_CSS = `
 @keyframes dshIdleGlint { 0%, 70%, 100% { opacity: 0.8; } 80% { opacity: 0.1; } }
 @keyframes dshWaitBreath { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 [data-conclusion-waiting] { animation: dshWaitBreath 1.6s ease-in-out infinite; }
+
+/* Canvas texture: a 24px dot grid turns the flat void into a workbench. */
+.dsh-canvas-surface {
+  background-image: radial-gradient(${theme.border} 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+/* Node cards lift on hover — the standard affordance for "this is grabbable". */
+.dsh-node-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+[data-canvas-node]:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4); }
+/* Threads feeding working sessions flow, like the swarm's silk. */
+.dsh-edge-busy { stroke-dasharray: 6 6; animation: dshDashFlow 0.9s linear infinite; }
 @keyframes dshWaitBreath { 0%, 100% { opacity: 0.45; } 50% { opacity: 1; } }
 [data-conclusion-waiting] { animation: dshWaitBreath 1.6s ease-in-out infinite; }
 .dsh-robot-v-search.dsh-robot-idle [data-robot-part='magnifier'] { transform-origin: 24px 20px; animation: dshIdleSwing 3.6s ease-in-out infinite; }
@@ -421,6 +432,12 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
 
   const now = Date.now()
   const needle = query.trim().toLowerCase()
+  const runningCount = [...canvas.graph.nodes.values()]
+    .filter(node => {
+      const kind = canvas.statusOf(node.id).kind
+      return kind === 'thinking' || kind === 'tool'
+    })
+    .length
   const matches = (needle: string): number =>
     needle === '' ? 0 : [...canvas.graph.nodes.values()].filter(node => matchesNode(node, needle)).length
   const selectedNode = selectedId === undefined ? undefined : canvas.graph.nodes.get(selectedId)
@@ -581,7 +598,14 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
             borderRadius: 6, padding: '3px 8px', width: 180, font: 'inherit',
           }}
         />
-        <span style={{ color: theme.muted }}>{canvas.graph.nodes.size} 个会话</span>
+        <span style={{ color: theme.muted }}>
+          {canvas.graph.nodes.size} 个会话
+          {runningCount > 0 && (
+            <span data-canvas-running-count style={{ color: theme.warn, marginLeft: 6 }}>
+              · {runningCount} 运行中
+            </span>
+          )}
+        </span>
         <button type="button" data-canvas-fit onClick={fit} style={buttonStyle}>适配视图</button>
         {canvas.refresh !== undefined && (
           <button type="button" data-canvas-refresh onClick={() => canvas.refresh?.()} style={buttonStyle}>刷新</button>
@@ -592,6 +616,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
         <div
           ref={surfaceRef}
           data-canvas-surface
+          className="dsh-canvas-surface"
           onMouseDown={event => {
             drag.current = {
               startX: event.clientX, startY: event.clientY,
@@ -673,6 +698,7 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
                   stroke={edge.active ? theme.accent : edge.hover ? theme.text : edge.busy ? theme.warn : theme.border}
                   strokeWidth={edge.active ? 1.8 : edge.hover ? 2 : edge.busy ? 1.6 : 1.5}
                   opacity={edge.active ? 1 : edge.busy ? 0.8 : 0.7}
+                  className={edge.busy ? 'dsh-edge-busy' : undefined}
                   markerEnd={edge.active ? 'url(#dsh-arrow-accent)' : edge.busy ? 'url(#dsh-arrow-warn)' : 'url(#dsh-arrow)'}
                 />
               ))}

@@ -52,6 +52,7 @@ export const NodeCard: FC<NodeCardProps> = ({
 }) => (
   <div
     data-canvas-node={node.id}
+    className="dsh-node-card"
     title={node.title}
     data-selected={selected ? 'true' : 'false'}
     data-comparing={comparing ? 'true' : 'false'}
