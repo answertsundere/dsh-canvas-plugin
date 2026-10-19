@@ -1042,6 +1042,16 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34d: rounds 31–33 — collapse, active-only, archived members (2026-10-17)
+
+- **Round 31 (subtree collapse)**: nodes with children carry a −/+ toggle; collapsing hides the entire descendant subtree (`hiddenByCollapse`, BFS) and the layout, edges, and minimap re-derive from the filtered graph.
+- **Round 32 (只看活跃)**: the swarm header toggles idle members out of the web.
+- **Round 33 (archived members)**: archived teammates join the web as static chips **without live windows** (`isArchived` dep wired from `toArchivedIds`). The regression test caught a real bypass: the nodes loop opened windows for merged member nodes, skipping the archived filter — member windows are now owned by the member loop alone.
+
+**Numbers:** 18 files / **357 tests** green; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34d: round 30 — active members float, idle members dim (2026-10-17)
 
 The swarm orders member robots by life — streaming, then running, then failed, then idle — and idle chips render at 0.62 opacity. Active work is always the first thing the eye finds. **351 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
