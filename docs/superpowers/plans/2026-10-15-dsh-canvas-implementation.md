@@ -1052,6 +1052,12 @@ Behavior: validate (`atSeq` a non-negative integer; `launch:'now'` requires a no
 
 ---
 
+### Task 34a: round 34 — member cards wear their shared task (2026-10-17)
+
+A teammate executing an in-progress shared task wears it on the card: an amber ⚡ line with the task subject (+N when several), folded from the agentTeam projection's in_progress tasks per owner session (`teamTasksByOwner`, pure). The board, the swarm, and the map now tell the same story everywhere. **360 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
+
+---
+
 ### Task 34d: round 30 — active members float, idle members dim (2026-10-17)
 
 The swarm orders member robots by life — streaming, then running, then failed, then idle — and idle chips render at 0.62 opacity. Active work is always the first thing the eye finds. **351 tests green**; both profiles reinstalled, `m0-check` 11/11 ×2.
