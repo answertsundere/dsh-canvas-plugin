@@ -78,6 +78,10 @@ export interface CanvasModel {
    * returned controller and must dispose it on close.
    */
   inspectSwarm?(id: string): AgentSwarmController
+  /** Subagent-origin sessions currently appear as lineage nodes. */
+  showSubagents?: boolean
+  /** Flips `showSubagents`; absent → the toolbar hides the 子代理 toggle. */
+  toggleShowSubagents?(): void
 }
 
 /** The subset of `ForkResult` the tab shows. */

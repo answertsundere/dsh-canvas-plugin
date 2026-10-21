@@ -69,6 +69,7 @@ function toSummary(key: string | undefined, raw: unknown): SessionSummaryLike | 
     createdAt: finite(raw.createdAt) ?? finite(raw.updatedAt) ?? 0,
     running: raw.running === true,
     available: true,
+    ...(raw.origin === 'subagent' ? { origin: 'subagent' as const } : {}),
   }
 }
 

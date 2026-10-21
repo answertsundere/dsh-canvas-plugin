@@ -132,6 +132,23 @@ export const NodeCard: FC<NodeCardProps> = ({
       {status.label} · {relativeTime(now, node.createdAt)} · {node.childCount} 分支
       {node.externalParent && <span title="父会话不在当前工作区"> · 外部父</span>}
     </div>
+    {(node.subagentCount ?? 0) > 0 && onInspect !== undefined && (
+      <button
+        type="button"
+        data-node-subagent-count={node.id}
+        title="这个对话内部的子代理数量——点开 ⌖ 实况看它们的蛛网协作"
+        onClick={event => { event.stopPropagation(); onInspect(node.id) }}
+        style={{
+          marginTop: 4, alignSelf: 'flex-start',
+          background: 'transparent', color: theme.muted,
+          border: `1px dashed ${theme.border}`, borderRadius: 4,
+          font: '10px system-ui, sans-serif', lineHeight: '15px',
+          padding: '0 5px', cursor: 'pointer',
+        }}
+      >
+        🤖 机器人 ×{node.subagentCount}
+      </button>
+    )}
     {collapseToggle !== undefined && collapseToggle.visible && (
       <button
         type="button"

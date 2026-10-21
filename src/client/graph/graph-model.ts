@@ -9,6 +9,18 @@ export interface SessionSummaryLike {
   available: boolean
   seeded?: boolean
   cwd?: string
+  /** DSH's coarse durable origin; `'subagent'` marks conversation-internal agents. */
+  origin?: 'subagent'
+}
+
+export interface LineageGraphOptions {
+  /**
+   * Show subagent-origin sessions as first-class nodes. Default false: the
+   * outer canvas is the conversation-to-conversation lineage — subagents are
+   * one conversation's internals, so they fold into the parent card as a
+   * count and their real home is the ⌖ swarm view.
+   */
+  readonly includeSubagents?: boolean
 }
 
 const byAge = (createdAt: (id: SessionId) => number) => (a: SessionId, b: SessionId): number => {
@@ -32,10 +44,28 @@ const byAge = (createdAt: (id: SessionId) => number) => (a: SessionId, b: Sessio
 export function buildLineageGraph(
   summaries: SessionSummaryLike[],
   memberIds: ReadonlySet<string>,
+  options: LineageGraphOptions = {},
 ): CanvasGraph {
-  const members = new Map<SessionId, SessionSummaryLike>()
+  const includeSubagents = options.includeSubagents ?? false
+  const roster = new Map<SessionId, SessionSummaryLike>()
   for (const summary of summaries) {
-    if (memberIds.has(summary.id)) members.set(summary.id, summary)
+    if (memberIds.has(summary.id)) roster.set(summary.id, summary)
+  }
+
+  // Subagent-origin sessions belong to the conversation that spawned them.
+  // Unless explicitly included they are lifted out of the member set and
+  // folded into their parent as `subagentCount`; one whose parent is absent
+  // from the workspace is dropped with the rest of the orphans.
+  const subagentCount = new Map<SessionId, number>()
+  const members = new Map<SessionId, SessionSummaryLike>()
+  for (const [id, summary] of roster) {
+    if (summary.origin === 'subagent' && !includeSubagents) {
+      if (summary.parentId != null && roster.has(summary.parentId)) {
+        subagentCount.set(summary.parentId, (subagentCount.get(summary.parentId) ?? 0) + 1)
+      }
+      continue
+    }
+    members.set(id, summary)
   }
 
   const children = new Map<SessionId, SessionId[]>()
@@ -106,6 +136,7 @@ export function buildLineageGraph(
       cwd: summary.cwd ?? null,
       childCount: children.get(id)?.length ?? 0,
       depth: depth.get(id) ?? 0,
+      ...(subagentCount.has(id) ? { subagentCount: subagentCount.get(id) } : {}),
     })
   }
 

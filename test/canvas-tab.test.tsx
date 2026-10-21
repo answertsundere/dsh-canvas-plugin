@@ -854,3 +854,43 @@ describe('glow layer', () => {
     expect(container.querySelector('[data-edge-glow]')).toBeNull()
   })
 })
+
+describe('subagent folding UI', () => {
+  it('hides the 子代理 toggle when the model does not offer it', () => {
+    render(<CanvasTab canvas={model()} />)
+    expect(document.querySelector('[data-canvas-toggle-subagents]')).toBeNull()
+  })
+
+  it('the toggle reflects state and flips it', () => {
+    const toggle = vi.fn()
+    const off = render(<CanvasTab canvas={model({ toggleShowSubagents: toggle, showSubagents: false })} />)
+    const button = document.querySelector('[data-canvas-toggle-subagents]')
+    expect(button?.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(button as Element)
+    expect(toggle).toHaveBeenCalledTimes(1)
+    off.unmount()
+
+    render(<CanvasTab canvas={model({ toggleShowSubagents: toggle, showSubagents: true })} />)
+    expect(document.querySelector('[data-canvas-toggle-subagents]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(document.body.textContent).toContain('子代理·显示中')
+  })
+
+  it('a parent card folds its subagents into a count badge that opens the swarm', () => {
+    const parent = node('a', { childCount: 2, subagentCount: 3 })
+    const lineage = graph([parent, node('k', { parentId: 'a', depth: 1 })], ['a'])
+    const onInspect = vi.fn(() => ({ state: () => swarmStateFake, subscribe: () => () => {}, dispose: vi.fn() }) as never)
+    render(<CanvasTab canvas={model({
+      graph: lineage,
+      inspectSwarm: onInspect,
+    })} />)
+    const badge = document.querySelector('[data-node-subagent-count="a"]')
+    expect(badge?.textContent).toContain('机器人 ×3')
+    fireEvent.click(badge as Element)
+    expect(onInspect).toHaveBeenCalledWith('a')
+  })
+
+  it('no badge without subagents', () => {
+    render(<CanvasTab canvas={model({ graph: graph([node('a')], ['a']) })} />)
+    expect(document.querySelector('[data-node-subagent-count="a"]')).toBeNull()
+  })
+})

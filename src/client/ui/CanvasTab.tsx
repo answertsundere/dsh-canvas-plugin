@@ -608,6 +608,23 @@ export const CanvasTab: FC<CanvasTabProps> = ({ canvas }) => {
           )}
         </span>
         <button type="button" data-canvas-fit onClick={fit} style={buttonStyle}>适配视图</button>
+        {canvas.toggleShowSubagents !== undefined && (
+          <button
+            type="button"
+            data-canvas-toggle-subagents
+            aria-pressed={canvas.showSubagents === true}
+            title="子代理是对话内部的关系：默认折叠进父对话的「机器人 ×N」徽章，⌖ 实况里看全网"
+            onClick={() => canvas.toggleShowSubagents?.()}
+            style={{
+              ...buttonStyle,
+              ...(canvas.showSubagents === true
+                ? { borderColor: theme.accent, color: theme.accent }
+                : {}),
+            }}
+          >
+            {canvas.showSubagents === true ? '子代理·显示中' : '子代理'}
+          </button>
+        )}
         {canvas.refresh !== undefined && (
           <button type="button" data-canvas-refresh onClick={() => canvas.refresh?.()} style={buttonStyle}>刷新</button>
         )}

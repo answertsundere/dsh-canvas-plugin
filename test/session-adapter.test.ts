@@ -99,3 +99,18 @@ describe('toSummaries', () => {
     })
   })
 })
+
+describe('origin passthrough', () => {
+  it('maps the durable subagent origin and leaves other rows untouched', () => {
+    const rows = {
+      ids: ['r1', 'a'],
+      byId: {
+        r1: { id: 'r1', displayTitle: '机器人', running: false, origin: 'subagent' },
+        a: { id: 'a', displayTitle: '会话', running: false },
+      },
+    }
+    const out = toSummaries(rows)
+    expect(out.find(x => x.id === 'r1')?.origin).toBe('subagent')
+    expect(out.find(x => x.id === 'a')?.origin).toBeUndefined()
+  })
+})

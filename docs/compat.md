@@ -81,6 +81,14 @@ rough order of risk:
    log into a separate service, empties the web silently — the swarm is
    additive, so the failure mode is a root-only view, never a broken tab.
    Re-verify against the catalog module on any upgrade.
+11. **Subagent folding reads `SessionSummary.origin === 'subagent'`.** The
+   outer canvas drops subagent-origin rows from the lineage and folds them
+   into the parent card as `subagentCount`
+   (`api/session-controller/src/client/sessions/service.d.ts`: "Coarse
+   durable origin for navigation filtering"). If the field is renamed or the
+   origin value re-scoped, the folding silently stops and subagents reappear
+   as first-class lineage nodes — the pre-folding behavior, so degradation is
+   cosmetic. Rows without the field keep the old all-nodes behavior.
 
 ## Not verified
 

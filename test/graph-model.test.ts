@@ -98,3 +98,51 @@ describe('hiddenByCollapse', () => {
     expect([...hiddenByCollapse(nodes, new Set(['a']))]).toEqual(['b'])
   })
 })
+
+describe('subagent folding', () => {
+  const s = (id: string, extra: Partial<SessionSummaryLike> = {}): SessionSummaryLike =>
+    ({ id, createdAt: 0, running: false, available: true, ...extra })
+
+  it('lifts subagent-origin sessions out of the lineage and counts them on the parent', () => {
+    const g = buildLineageGraph([
+      s('a', { createdAt: 1 }),
+      s('r1', { parentId: 'a', origin: 'subagent' }),
+      s('r2', { parentId: 'a', origin: 'subagent' }),
+      s('b', { parentId: 'a', createdAt: 3 }),
+    ], new Set(['a', 'r1', 'r2', 'b']))
+    expect(g.nodes.has('r1')).toBe(false)
+    expect(g.nodes.has('r2')).toBe(false)
+    expect(g.nodes.get('a')?.subagentCount).toBe(2)
+    expect(g.nodes.get('a')?.childCount).toBe(1)
+    expect(g.nodes.get('b')?.parentId).toBe('a')
+    expect(g.maxDepth).toBe(1)
+  })
+
+  it('includeSubagents restores them as first-class nodes', () => {
+    const members = [
+      s('a', { createdAt: 1 }),
+      s('r1', { parentId: 'a', origin: 'subagent' }),
+      s('r2', { parentId: 'a', origin: 'subagent' }),
+    ]
+    const shown = buildLineageGraph(members, new Set(['a', 'r1', 'r2']), { includeSubagents: true })
+    expect(shown.nodes.has('r1')).toBe(true)
+    expect(shown.nodes.get('r1')?.depth).toBe(1)
+    expect(shown.nodes.get('a')?.childCount).toBe(2)
+  })
+
+  it('drops a subagent whose parent is outside the workspace', () => {
+    const g = buildLineageGraph([s('r1', { parentId: 'ghost', origin: 'subagent' })], new Set(['r1']))
+    expect(g.nodes.size).toBe(0)
+    expect(g.roots).toEqual([])
+  })
+
+  it('rows without an origin behave exactly as before', () => {
+    const g = buildLineageGraph([
+      s('a', { createdAt: 1 }),
+      s('b', { parentId: 'a', createdAt: 2 }),
+    ], new Set(['a', 'b']))
+    expect(g.nodes.get('a')?.subagentCount).toBeUndefined()
+    expect(g.nodes.get('b')?.parentId).toBe('a')
+    expect(g.roots).toEqual(['a'])
+  })
+})

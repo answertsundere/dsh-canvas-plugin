@@ -17,6 +17,12 @@ export interface CanvasNode {
   readonly teamRole?: 'lead' | 'teammate'
   /** In-progress shared task subjects owned by this session. */
   readonly teamTasks?: readonly string[]
+  /**
+   * Subagent-origin sessions spawned by this conversation, folded here while
+   * they are hidden from the lineage. The card shows 机器人 ×N and the ⌖
+   * swarm view is their real home.
+   */
+  readonly subagentCount?: number
 }
 
 export interface CanvasGraph {

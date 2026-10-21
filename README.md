@@ -23,7 +23,7 @@ DSH supports forking natively and the sidebar lists sessions, but:
 
 ## v1 capabilities
 
-- **Lineage canvas** — workspace sessions laid out left→right by `parentSession`. A linear chain stays on one row; only real branches spread downward. Zoom 0.4–2×, drag to pan, fit to view, search to locate.
+- **Lineage canvas** — workspace sessions laid out left→right by `parentSession`. A linear chain stays on one row; only real branches spread downward. Zoom 0.4–2×, drag to pan, fit to view, search to locate. Subagent sessions are conversation-internal, so they stay out of the lineage by default — each parent folds them into a 「机器人 ×N」 badge that jumps straight to its ⌖ web, and a toolbar toggle (子代理) brings them back as nodes.
 - **Fork from any message** — the detail panel lists the branch's own turns with their real `seq` range and a 「⑂ fork here」 action. The cut is that row's own last event seq, so it is **always a real event**.
 - **Two launch modes** — 「run now」 queues the instruction into the child; 「create empty branch」 sends nothing at all.
 - **Deterministic comparison** — compares only events after each branch's `inheritedEventCount`, aligned positionally, never semantically. 「Carry conclusion」 produces an **editable draft** and never submits.

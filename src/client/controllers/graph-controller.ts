@@ -87,6 +87,9 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
   // the controller is cached per conversation.
   const collapsedNodes = new Set<SessionId>()
   let view: CanvasView = IDENTITY_VIEW
+  // Subagent-origin sessions default out of the lineage: the outer canvas is
+  // the conversation-to-conversation view. The toolbar flips this back on.
+  let showSubagents = false
   const listeners = new Set<() => void>()
 
   /**
@@ -209,7 +212,9 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
       cwd,
       toArchivedIds(deps.workspaceSnapshot()),
     )
-    graph = buildLineageGraph(selection.members, new Set(selection.members.map(summary => summary.id)))
+    graph = buildLineageGraph(selection.members, new Set(selection.members.map(summary => summary.id)), {
+      includeSubagents: showSubagents,
+    })
 
     // Team members answer to their team name, not to the prompt that spawned
     // them — and they wear the team role so the canvas can badge them.
@@ -370,6 +375,12 @@ export function createGraphController(deps: GraphControllerDeps): GraphControlle
     },
     searchNext,
     refresh,
+    get showSubagents() { return showSubagents },
+    toggleShowSubagents: () => {
+      showSubagents = !showSubagents
+      refresh()
+      notify()
+    },
     subscribe: listener => {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
